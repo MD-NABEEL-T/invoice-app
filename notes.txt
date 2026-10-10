@@ -1,0 +1,122 @@
+# HANDOFF: GST Invoice App for Uncle's Business
+
+## 0. How to work with me (the user)
+- I'm Nabeel, a CSE student (final year) and a MERN developer (React + Vite, Node, Express, MongoDB). I also know Firebase, JWT, Tailwind and GSAP. I speak casually and directly, so straight talk is fine.
+- Guide me **one action at a time** during hands-on setup. Wait for my result or screenshot before the next step.
+- Explain with a short **analogy first**, then code.
+- Keep interview-relevant explanations at "not too much, not too little".
+- Test backend or data logic (Postman or tests) before building the UI.
+- Do not trust my assumptions blindly. Verify tax and legal facts rather than guessing.
+- I'm on Windows. I use Command Prompt and VS Code.
+
+## 1. Project goal
+Build a free web app that replaces my uncle's Excel/macro GST invoicing. He is a small supplier (firm: Khansa Enterprises, Melvisharam, Tamil Nadu). His goals:
+- Stop retyping everything. He just wants to **print invoices**.
+- Pick the buyer company from a **dropdown** (2-3 companies).
+- Simple UI.
+- Zero cost.
+It is also a resume project for me, so I want to understand every line.
+
+## 2. What I analysed (3 uploaded Excel files)
+- `SINGLE_FORMAT.xlsm`: invoice template for ONE GST rate. `2BILLTAX_FORMAT.xlsm`: invoice template for TWO rates. `tax_format.xlsx`: monthly sheets (Sheet1 = statement of bills to the buyer; HARDCOPY; GST = monthly sales register; CONSOLIDATE; PURCHASE; "Dublicate1" = list of ~80 item descriptions used for dropdowns).
+- The macros only convert amounts to words (Indian lakh/crore style) and make a dropdown helper. They are harmless.
+- Buyer in the samples: KH Exports (same GSTIN, different units/addresses: Unit III Melvisharam, and a Chennai/Poonamallee address). A buyer can have multiple addresses.
+- Volume: invoice numbers run about 001 to 047 in one month (~45-50 invoices/month). April register ≈ ₹1.35 lakh/month taxable+tax, so annual turnover is roughly ₹16-20 lakh (far below ₹5 crore).
+- Invoice number format: `047/25-26` (running number / financial year). FY starts 1 April.
+
+### Test cases to reproduce (from the samples)
+- Invoice 046: hair cap net 625 @5% + nozzle 500 @18%. Taxable 1125. CGST 15.625 + 45, SGST 15.625 + 45, total tax 121.25, **grand total 1246.25**.
+- Invoice 047: lines 200 + 1100 + 1575 = 2875 @18%. Tax 517.50 (CGST 258.75 + SGST 258.75). **Grand total 3392.50**.
+- The old sheet's "Total (round off)" label does not actually round. Ask the uncle whether he rounds to the nearest rupee.
+
+### Problems found in his Excel
+1. In the 2-rate template, CGST/SGST, the HSN summary and total tax are **hardcoded**, so changing qty or rate leaves the tax stale while the grand total changes.
+2. The single-rate template applies the FIRST line's rate to the sum of all lines, which is wrong if rates are mixed.
+3. Several dates in `tax_format.xlsx` look **day/month swapped** (for example serial 45692 = 4 Feb 2025 on invoice 001/25-26, which should be about 2 April). Others are plain text like "18/4/2025".
+4. Some HSN codes look wrong (for example 91051900 for a hair cap net is the clocks chapter, while hair nets belong to chapter 65; Surf Excel detergent was under a soap code 3401 where detergent is normally 3402). Treat all old HSN codes as unverified.
+5. Sheet titles are inconsistent (CONSOLIDATE says FEB 2023), and the item list has typos and duplicates.
+6. All monthly sheets are retyped from invoices. A single source of truth is needed.
+
+## 3. GST facts to respect (verify before relying on them)
+- From **22 Sept 2025** the 12% and 28% slabs were removed. The slabs are now **0%, 5%, 18%, 40%**. Many items changed (for example soaps, toothpaste and similar personal care moved 18% to 5%). **Old sheet rates (12%, 28%, 18% for soaps) are outdated.**
+- Rate and HSN must be per item but editable per invoice line, and rates need effective dates so old invoices never change.
+- As far as I know, taxpayers with turnover under ₹5 crore need only **4-digit HSN** on invoices (6-digit above). Confirm with whoever files his returns.
+- GST invoice numbers should run consecutively within a financial year, so invoices should be **cancelled, never deleted or edited** after finalising. Confirm with a tax professional.
+- Uncle has **no CA**. HSN codes and rates cannot be certified by AI. A human (his return filer or a local tax consultant) must confirm the active items. The app should mark each item "verified" or "needs checking".
+- Do not import HSN or rates blindly from the old Excel.
+
+## 4. Decisions made (and why)
+**Stack (chosen for the app's needs):**
+- Frontend: **React + Vite + Tailwind** (PWA-installable).
+- DB + auth: **Supabase** (Postgres, Auth, row-level security). Public signup disabled, one login for him.
+- Hosting: **Cloudflare Pages** (Netlify equivalent). **NOT Vercel Hobby**, because its free plan is non-commercial and this is a business.
+- No custom backend. Invoice maths runs in the browser and Postgres protects the data.
+- Printing: A4 `@media print` stylesheet plus Save as PDF (phone flow: PDF then WhatsApp). Excel export via SheetJS.
+- Invoices must store a **snapshot** of buyer, item, HSN and rate at issue time.
+- Catches:
+  - Supabase free projects **pause after ~1 week of inactivity**. Fix: scheduled keep-alive ping (GitHub Actions cron) plus an "Export all data" button (own backups).
+  - Fallbacks: Firebase (never pauses, but NoSQL and weaker reports) or Neon (Postgres that scales to zero, but needs a backend).
+- Rejected: Spring Boot (poor free hosting, slow), a native app (unnecessary; printing is the goal).
+- Devices: uncle usually prints from a **laptop**. The phone must work too (stacked form, Save as PDF and share).
+
+## 5. Requirements (draft for the uncle to confirm)
+**Version 1**
+1. Private login (laptop and phone).
+2. Buyer list: name, GSTIN, state code, multiple addresses/units, dropdown selection.
+3. Item list: description, HSN (4-digit), GST %, unit; import his ~80 items; add/edit anytime; "verified" flag.
+4. New invoice: buyer, date, DC no/date, PO no/date; pick items; type only qty and rate (rate prefills from the last bill, editable).
+5. Automatic: line amount, taxable value, CGST/SGST split, mixed rates in one invoice, total, round-off, amount in words (Indian system).
+6. Auto invoice number (`048/25-26`), continues the series, resets each 1 April (a Postgres function plus counters table).
+7. Print-ready A4 invoice matching his current bill; Save as PDF.
+8. Invoice list and search (number/buyer/date), reprint, copy as new.
+9. Finalised invoices are locked: cancel only, no delete.
+10. Works on laptop and phone.
+
+**Reports (replace his Excel sheets)**
+11. Monthly GST sales Excel (rate-wise taxable, CGST, SGST).
+12. Printable monthly statement of bills for the buyer with DC/PO numbers.
+
+**Later:** dashboard, pending payments, purchase entries, WhatsApp share, second user, PWA install, backup button.
+
+## 6. Info needed from the uncle
+- Firm details: name, address, phone, email, GSTIN, state/state code, bank details, signature/stamp image, logo, terms and conditions text.
+- Buyers: exact names, GSTIN, state code, every address/unit, extra fields needed (PO/DC).
+- Items: which of the ~80 he still sells, unit, usual rate.
+- Last invoice number used this FY; his standard invoice format; whether he rounds to the nearest rupee; plain A4 or letterhead; printer type.
+- **Who files his GST returns** (him or an accountant) and his approximate yearly turnover.
+- Login email and whether anyone else needs access.
+- Whether old invoices need importing or he starts fresh from a cut-off date.
+- Clarify: does the "dropdown of 2-3 companies" mean his buyers, or does he also bill under more than one of his own firm names?
+
+## 7. Build plan
+| Step | Work | Done when |
+|---|---|---|
+| 1 | Setup: GitHub repo `invoice-app`, Vite + React + Tailwind, Supabase project, Cloudflare Pages | Blank app live on a URL |
+| 2 | Tax logic as pure functions + tests (Vitest): GST by rate, CGST/SGST, round-off, amount in words, FY detection | Reproduces ₹1,246.25 and ₹3,392.50 |
+| 3 | DB: `buyers`, `buyer_addresses`, `items`, `invoices`, `invoice_lines`, `counters`; RLS; next-number function | Verified via Postman against the Supabase REST API before any UI |
+| 4 | Screens: login, buyers, items, new invoice, list/search, copy-as-new | Create an invoice end to end |
+| 5 | A4 print stylesheet and PDF | Printout matches his Excel bill |
+| 6 | Reports (Excel export, statement) | Matches his April sheets |
+| 7 | Hardening: keep-alive cron, data export, PWA, test on his phone and printer | A real bill printed on his setup |
+| 8 | Handover: 1-hour walkthrough, run parallel with Excel for a month | He stops using Excel |
+Estimate: about 3-4 weekends of part-time work.
+
+## 8. Current status
+- Done: analysis, stack decision, requirements draft, plan.
+- Environment: Windows. Node **v22.14.0** installed. VS Code installed.
+- Antigravity IDE's agent does not work on my laptop. The language server gets killed (SIGTERM) and RAM sits at ~84% with Chrome and the IDE open. Decision: **use VS Code** for this project and free memory.
+- In progress: Step 1. I was told to run, in Command Prompt:
+```
+  cd %USERPROFILE%\Documents
+  npm create vite@latest invoice-app -- --template react
+```
+  (answer No to experimental/rolldown options and No to "install and start now").
+- Pending from me: create the empty GitHub repo `invoice-app`; send the uncle the info checklist; find who files his GST returns; get the list of active items.
+
+## 9. Next actions (for the AI continuing)
+1. Ask me what the Vite command printed. Fix any error.
+2. Then: `cd invoice-app`, `npm install`, `npm run dev`, confirm it opens in the browser.
+3. Add Tailwind (use the current Vite plugin setup from the official docs).
+4. `git init`, connect to my GitHub repo `invoice-app`, first commit and push.
+5. Start Step 2 (tax functions with tests) before touching Supabase.
+Give one action per message and wait for my result.
