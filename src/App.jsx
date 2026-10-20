@@ -7,6 +7,7 @@ import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import NewBill from './pages/NewBill.jsx';
 import Bills from './pages/Bills.jsx';
+import BillView from './pages/BillView.jsx';
 import Reports from './pages/Reports.jsx';
 import More from './pages/More.jsx';
 import Settings from './pages/Settings.jsx';
@@ -34,6 +35,7 @@ export default function App() {
             <Route index element={<Home />} />
             <Route path="new" element={<NewBill />} />
             <Route path="bills" element={<Bills />} />
+            <Route path="bills/:id" element={<BillView />} />
             <Route path="reports" element={<Reports />} />
             <Route path="more" element={<More />} />
             <Route path="settings" element={<Settings />} />

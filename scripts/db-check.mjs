@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
+import { buildInvoicePayload } from '../src/lib/billPayload.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -812,6 +813,74 @@ async function run() {
       } else {
         recordResult('Test 15', 'change_starting_number Verification', false, err.message);
       }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Test 16: Builder-Made Payload through create_invoice (Phase 5)
+  // ---------------------------------------------------------------------------
+  if (!jwt) {
+    recordResult('Test 16', 'Builder-made Payload create_invoice', false, 'Skipped: Not authenticated');
+  } else {
+    try {
+      const header16 = {
+        invoice_date: '2099-04-25',
+        buyer_name: 'KH EXPORT INDIA PRIVATE LTD',
+        buyer_gstin: '33AAACR1714R1ZA',
+        buyer_state_code: '33',
+        buyer_address: 'Leather Goods Division\n4/74 V.O.C street seneerkuppam, Poonamallee\nChennai-56',
+        buyer_order_no: 'PO-BUILDER-TEST-16',
+        buyer_order_date: '24/04/2099',
+        delivery_no: '0000',
+        delivery_date: '2099-04-25',
+        despatched_through: 'Direct Delivery',
+        destination: 'Chennai',
+        terms_of_delivery: null,
+      };
+
+      const lines16 = [
+        {
+          description: 'Builder Test Hair Cap Net',
+          hsn: '6505',
+          unit: 'PCS',
+          quantity: '1',
+          rate: '625.00',
+          gst_percent: 5,
+        },
+        {
+          description: 'Builder Test Nozzle',
+          hsn: '8481',
+          unit: 'PCS',
+          quantity: '1',
+          rate: '500.00',
+          gst_percent: 18,
+        },
+      ];
+
+      const payload16 = buildInvoicePayload({ header: header16, lines: lines16 });
+      const { data: data16, error: err16 } = await authClient.rpc('create_invoice', { payload: payload16 });
+
+      if (err16 || !data16?.invoice_no) {
+        throw new Error(err16?.message || 'create_invoice returned empty response');
+      }
+
+      if (data16.invoice_no.endsWith('/99-00') && data16.id) {
+        recordResult(
+          'Test 16',
+          'Builder-made Payload create_invoice',
+          true,
+          `Successfully created invoice ${data16.invoice_no} (id: ${data16.id})`
+        );
+      } else {
+        recordResult(
+          'Test 16',
+          'Builder-made Payload create_invoice',
+          false,
+          `Unexpected response: ${JSON.stringify(data16)}`
+        );
+      }
+    } catch (err) {
+      recordResult('Test 16', 'Builder-made Payload create_invoice', false, err.message);
     }
   }
 

@@ -1,4 +1,6 @@
-import { paiseToRupees } from './tax.js';
+import { paiseToRupees, amountInWords } from './tax.js';
+
+export { amountInWords as numberToWordsIndian };
 
 /**
  * Formats an ISO date string (YYYY-MM-DD) into DD/MM/YYYY for bill display.
