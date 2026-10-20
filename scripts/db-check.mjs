@@ -100,6 +100,25 @@ async function run() {
     recordResult('Test 1', 'User Login', false, err.message);
   }
 
+  // Ensure counters exist for test FYs ('99-00' and '98-99'), tolerating "already exists"
+  if (jwt) {
+    for (const testFy of ['99-00', '98-99']) {
+      try {
+        const { error: setErr } = await authClient.rpc('set_starting_number', {
+          p_fy: testFy,
+          p_last_used: 0
+        });
+        if (setErr && !setErr.message.includes('already exists') && !setErr.message.includes('already exist')) {
+          console.warn(`Warning initializing starting number for ${testFy}: ${setErr.message}`);
+        }
+      } catch (err) {
+        if (!err.message.includes('already exists') && !err.message.includes('already exist')) {
+          console.warn(`Warning initializing starting number for ${testFy}: ${err.message}`);
+        }
+      }
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Test 2: Call create_invoice Twice (Sequential Numbering & Format)
   // ---------------------------------------------------------------------------
@@ -408,6 +427,281 @@ async function run() {
       }
     } catch (err) {
       recordResult('Test 9', 'Direct Table INSERT Revoked', true, `Denied: ${err.message}`);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Test 10: 10 Parallel create_invoice Calls on FY 99-00 (Unique & Consecutive)
+  // ---------------------------------------------------------------------------
+  if (!jwt) {
+    recordResult('Test 10', '10 Parallel create_invoice Calls', false, 'Skipped: Not authenticated');
+  } else {
+    try {
+      const parallelCount = 10;
+      const basePayload10 = {
+        invoice_date: '2099-04-20',
+        buyer_name: 'KH EXPORT INDIA PRIVATE LTD',
+        buyer_gstin: '33AAACR1714R1ZA',
+        buyer_state_code: '33',
+        buyer_address: 'Leather Goods Division\n4/74 V.O.C street seneerkuppam, Poonamallee\nChennai-56',
+        buyer_order_date: '20/04/2099',
+        delivery_no: '0000',
+        delivery_date: null,
+        despatched_through: 'Direct Delivery',
+        destination: 'Chennai',
+        terms_of_delivery: null,
+        taxable_paise: 20000,
+        cgst_paise: 1800,
+        sgst_paise: 1800,
+        payable_paise: 23600,
+        lines: [
+          {
+            line_no: 1,
+            description: 'Cleaning Detergent',
+            hsn: '3402',
+            unit: 'KG',
+            qty_milli: 1000,
+            rate_paise: 20000,
+            gst_percent: 18
+          }
+        ]
+      };
+
+      const promises = Array.from({ length: parallelCount }, (_, idx) => {
+        const payload = {
+          ...basePayload10,
+          buyer_order_no: `PO-PARALLEL-${idx + 1}`
+        };
+        return authClient.rpc('create_invoice', { payload });
+      });
+
+      const responses = await Promise.all(promises);
+      const errors = responses.filter((r) => r.error);
+      if (errors.length > 0) {
+        throw new Error(`${errors.length} parallel calls failed: ${errors[0].error.message}`);
+      }
+
+      const invoiceNos = responses.map((r) => r.data.invoice_no);
+      const allFy99 = invoiceNos.every((no) => no.endsWith('/99-00'));
+      if (!allFy99) {
+        throw new Error(`Not all invoice numbers end with /99-00: ${invoiceNos.join(', ')}`);
+      }
+
+      const nums = invoiceNos.map((no) => parseInt(no.split('/')[0], 10)).sort((a, b) => a - b);
+      const uniqueNums = new Set(nums);
+      if (uniqueNums.size !== parallelCount) {
+        throw new Error(`Duplicate numbers detected: got ${uniqueNums.size} unique out of ${parallelCount}`);
+      }
+
+      let consecutive = true;
+      for (let i = 1; i < nums.length; i++) {
+        if (nums[i] !== nums[i - 1] + 1) {
+          consecutive = false;
+          break;
+        }
+      }
+
+      if (!consecutive) {
+        throw new Error(`Numbers are not consecutive: ${nums.join(', ')}`);
+      }
+
+      recordResult(
+        'Test 10',
+        '10 Parallel create_invoice Calls',
+        true,
+        `10 unique consecutive numbers: ${nums[0]} to ${nums[nums.length - 1]}`
+      );
+    } catch (err) {
+      recordResult('Test 10', '10 Parallel create_invoice Calls', false, err.message);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Test 11: FY Boundary Detection (2099-03-31 -> '98-99', 2099-04-01 -> '99-00')
+  // ---------------------------------------------------------------------------
+  if (!jwt) {
+    recordResult('Test 11', 'FY Boundary Detection', false, 'Skipped: Not authenticated');
+  } else {
+    try {
+      const basePayload11 = {
+        buyer_name: 'KH EXPORT INDIA PRIVATE LTD',
+        buyer_gstin: '33AAACR1714R1ZA',
+        buyer_state_code: '33',
+        buyer_address: 'Leather Goods Division',
+        buyer_order_date: '01/04/2099',
+        despatched_through: 'Direct',
+        taxable_paise: 20000,
+        cgst_paise: 1800,
+        sgst_paise: 1800,
+        payable_paise: 23600,
+        lines: [
+          {
+            line_no: 1,
+            description: 'Cleaning Detergent',
+            hsn: '3402',
+            unit: 'KG',
+            qty_milli: 1000,
+            rate_paise: 20000,
+            gst_percent: 18
+          }
+        ]
+      };
+
+      // 11A: Date 2099-03-31 must land in 98-99
+      const payload31 = {
+        ...basePayload11,
+        invoice_date: '2099-03-31',
+        buyer_order_no: 'PO-FY-MAR31'
+      };
+      const { data: data31, error: err31 } = await authClient.rpc('create_invoice', { payload: payload31 });
+      if (err31 || !data31?.invoice_no) {
+        throw new Error(`2099-03-31 failed: ${err31?.message || 'No invoice_no'}`);
+      }
+
+      // 11B: Date 2099-04-01 must land in 99-00
+      const payload01 = {
+        ...basePayload11,
+        invoice_date: '2099-04-01',
+        buyer_order_no: 'PO-FY-APR01'
+      };
+      const { data: data01, error: err01 } = await authClient.rpc('create_invoice', { payload: payload01 });
+      if (err01 || !data01?.invoice_no) {
+        throw new Error(`2099-04-01 failed: ${err01?.message || 'No invoice_no'}`);
+      }
+
+      if (data31.invoice_no.endsWith('/98-99') && data01.invoice_no.endsWith('/99-00')) {
+        recordResult(
+          'Test 11',
+          'FY Boundary Detection',
+          true,
+          `2099-03-31 -> ${data31.invoice_no}, 2099-04-01 -> ${data01.invoice_no}`
+        );
+      } else {
+        recordResult(
+          'Test 11',
+          'FY Boundary Detection',
+          false,
+          `Boundary mismatch: 2099-03-31 gave ${data31.invoice_no}, 2099-04-01 gave ${data01.invoice_no}`
+        );
+      }
+    } catch (err) {
+      recordResult('Test 11', 'FY Boundary Detection', false, err.message);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Test 12: Rejections (empty buyer_order_no, missing despatched_through, zero lines, unset FY)
+  // ---------------------------------------------------------------------------
+  if (!jwt) {
+    recordResult('Test 12', 'Validation & Unset Counter Rejection', false, 'Skipped: Not authenticated');
+  } else {
+    try {
+      const validPayload12 = {
+        invoice_date: '2099-04-20',
+        buyer_name: 'KH EXPORT INDIA PRIVATE LTD',
+        buyer_gstin: '33AAACR1714R1ZA',
+        buyer_state_code: '33',
+        buyer_address: 'Leather Goods Division',
+        buyer_order_no: 'PO-VAL',
+        despatched_through: 'Direct',
+        taxable_paise: 20000,
+        cgst_paise: 1800,
+        sgst_paise: 1800,
+        payable_paise: 23600,
+        lines: [
+          {
+            line_no: 1,
+            description: 'Cleaning Detergent',
+            hsn: '3402',
+            unit: 'KG',
+            qty_milli: 1000,
+            rate_paise: 20000,
+            gst_percent: 18
+          }
+        ]
+      };
+
+      const rejections = [];
+
+      // 12A: Empty buyer_order_no
+      const p1 = { ...validPayload12, buyer_order_no: '   ' };
+      const { error: err1 } = await authClient.rpc('create_invoice', { payload: p1 });
+      if (!err1 || !err1.message.includes('buyer_order_no')) {
+        throw new Error(`Failed to reject empty buyer_order_no: ${err1?.message || 'succeeded'}`);
+      }
+      rejections.push('empty buyer_order_no');
+
+      // 12B: Missing despatched_through
+      const p2 = { ...validPayload12, despatched_through: '' };
+      const { error: err2 } = await authClient.rpc('create_invoice', { payload: p2 });
+      if (!err2 || !err2.message.includes('despatched_through')) {
+        throw new Error(`Failed to reject missing despatched_through: ${err2?.message || 'succeeded'}`);
+      }
+      rejections.push('missing despatched_through');
+
+      // 12C: Zero lines
+      const p3 = { ...validPayload12, lines: [], taxable_paise: 0, cgst_paise: 0, sgst_paise: 0, payable_paise: 0 };
+      const { error: err3 } = await authClient.rpc('create_invoice', { payload: p3 });
+      if (!err3 || !err3.message.includes('at least one line')) {
+        throw new Error(`Failed to reject zero lines: ${err3?.message || 'succeeded'}`);
+      }
+      rejections.push('zero lines');
+
+      // 12D: Date in FY with no starting number set (e.g. 2097-05-01 -> FY '97-98')
+      const p4 = { ...validPayload12, invoice_date: '2097-05-01' };
+      const { error: err4 } = await authClient.rpc('create_invoice', { payload: p4 });
+      if (!err4 || !err4.message.includes('Starting number not set for FY 97-98')) {
+        throw new Error(`Failed to reject unset FY: ${err4?.message || 'succeeded unexpectedly'}`);
+      }
+      rejections.push('unset FY 97-98');
+
+      recordResult(
+        'Test 12',
+        'Validation & Unset Counter Rejection',
+        true,
+        `Correctly rejected: ${rejections.join(', ')}`
+      );
+    } catch (err) {
+      recordResult('Test 12', 'Validation & Unset Counter Rejection', false, err.message);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Test 13: set_starting_number Refuses to Change Existing Series
+  // ---------------------------------------------------------------------------
+  if (!jwt) {
+    recordResult('Test 13', 'set_starting_number Immutability', false, 'Skipped: Not authenticated');
+  } else {
+    try {
+      const { data, error } = await authClient.rpc('set_starting_number', {
+        p_fy: '99-00',
+        p_last_used: 50
+      });
+
+      if (error && (error.message.includes('already exists') || error.message.includes('already exist'))) {
+        recordResult(
+          'Test 13',
+          'set_starting_number Immutability',
+          true,
+          `Correctly refused: ${error.message}`
+        );
+      } else if (!error) {
+        recordResult(
+          'Test 13',
+          'set_starting_number Immutability',
+          false,
+          'Unexpectedly allowed modifying existing FY 99-00 series'
+        );
+      } else {
+        recordResult(
+          'Test 13',
+          'set_starting_number Immutability',
+          false,
+          `Failed with unexpected error: ${error.message}`
+        );
+      }
+    } catch (err) {
+      recordResult('Test 13', 'set_starting_number Immutability', false, err.message);
     }
   }
 

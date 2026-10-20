@@ -241,6 +241,46 @@ EXECUTE FUNCTION public.check_invoice_update_trigger();
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
+-- Function: set_starting_number(p_fy text, p_last_used int)
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.set_starting_number(p_fy text, p_last_used int)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+    IF auth.uid() IS NULL THEN
+        RAISE EXCEPTION 'Unauthorized: User is not authenticated';
+    END IF;
+
+    IF p_fy IS NULL OR p_fy !~ '^[0-9]{2}-[0-9]{2}$' THEN
+        RAISE EXCEPTION 'Invalid FY format. Expected format like "26-27"';
+    END IF;
+
+    IF p_last_used IS NULL OR p_last_used < 0 THEN
+        RAISE EXCEPTION 'Starting number (last_used) must be 0 or greater';
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM public.counters WHERE fy = p_fy) THEN
+        RAISE EXCEPTION 'Counters row already exists for FY %', p_fy;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM public.invoices WHERE fy = p_fy) THEN
+        RAISE EXCEPTION 'Invoices already exist for FY %', p_fy;
+    END IF;
+
+    INSERT INTO public.counters (fy, last_number)
+    VALUES (p_fy, p_last_used);
+
+    RETURN jsonb_build_object(
+        'fy', p_fy,
+        'last_number', p_last_used
+    );
+END;
+$$;
+
+-- -----------------------------------------------------------------------------
 -- Function: cancel_invoice(invoice_id)
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.cancel_invoice(invoice_id uuid)
@@ -456,15 +496,15 @@ BEGIN
     END IF;
 
     -- 6. Atomically lock and increment counter for this financial year
-    INSERT INTO public.counters (fy, last_number)
-    VALUES (v_fy, 0)
-    ON CONFLICT (fy) DO NOTHING;
-
     SELECT last_number
     INTO v_next_number
     FROM public.counters
     WHERE fy = v_fy
     FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Starting number not set for FY %. Set it in Settings first.', v_fy;
+    END IF;
 
     v_next_number := v_next_number + 1;
 
@@ -634,7 +674,11 @@ GRANT EXECUTE ON FUNCTION public.create_invoice(jsonb) TO authenticated;
 REVOKE EXECUTE ON FUNCTION public.cancel_invoice(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.cancel_invoice(uuid) TO authenticated;
 
+REVOKE EXECUTE ON FUNCTION public.set_starting_number(text, int) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.set_starting_number(text, int) TO authenticated;
+
 -- =============================================================================
 -- Starting Sequence Number Setup
 -- =============================================================================
--- insert into counters (fy, last_number) values ('26-27', <last number used>);
+-- Initialize counter for a financial year via authenticated RPC or SQL:
+-- SELECT public.set_starting_number('26-27', <last number used>);

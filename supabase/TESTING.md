@@ -362,3 +362,60 @@ The test scripts read the following variables from `.env.local`:
   }
   ```
 - **Expected Status**: `403 Forbidden` or `401 Unauthorized`
+
+---
+
+## Test 10: 10 Parallel `create_invoice` Calls (Concurrency & Nonce)
+**Purpose**: Execute 10 simultaneous `create_invoice` RPC requests for FY `'99-00'` using `Promise.all` to verify that PostgreSQL row-level locks on `counters` guarantee 10 unique, strictly consecutive invoice numbers without race conditions.
+
+- **Method**: `POST` (x10 concurrently)
+- **URL**: `{{VITE_SUPABASE_URL}}/rest/v1/rpc/create_invoice`
+- **Expected Checks**:
+  - All 10 requests return `200 OK`.
+  - All 10 invoice numbers end in `/99-00`.
+  - The 10 sequential numbers are unique and strictly consecutive ($N, N+1, \dots, N+9$).
+
+---
+
+## Test 11: Financial Year Boundary Detection
+**Purpose**: Verify that invoice dates around the April 1 fiscal boundary are routed to the proper financial year:
+- `2099-03-31` (last day of March) -> FY `'98-99'`
+- `2099-04-01` (first day of April) -> FY `'99-00'`
+
+- **Method**: `POST`
+- **URL**: `{{VITE_SUPABASE_URL}}/rest/v1/rpc/create_invoice`
+- **Expected Checks**:
+  - Bill dated `2099-03-31` receives `.../98-99`.
+  - Bill dated `2099-04-01` receives `.../99-00`.
+
+---
+
+## Test 12: Input & Unset Counter Validation Rejections
+**Purpose**: Confirm that `create_invoice` raises an exception for any invalid payload and does NOT auto-create counters:
+1. Empty `buyer_order_no` (whitespace only) -> Rejection: `buyer_order_no is required`.
+2. Missing `despatched_through` -> Rejection: `despatched_through is required`.
+3. Empty `lines: []` -> Rejection: `Invoice must contain at least one line`.
+4. Invoice date in uninitialized FY (e.g. `2097-05-01` -> `'97-98'`) -> Rejection: `'Starting number not set for FY 97-98. Set it in Settings first.'`.
+
+---
+
+## Test 13: `set_starting_number` Immutability Guard
+**Purpose**: Verify that `set_starting_number` cannot alter or overwrite an existing counter series or a financial year where invoices already exist.
+
+- **Method**: `POST`
+- **URL**: `{{VITE_SUPABASE_URL}}/rest/v1/rpc/set_starting_number`
+- **Headers**:
+  ```http
+  apikey: {{VITE_SUPABASE_PUBLISHABLE_KEY}}
+  Authorization: Bearer {{USER_JWT}}
+  Content-Type: application/json
+  ```
+- **Body**:
+  ```json
+  {
+    "p_fy": "99-00",
+    "p_last_used": 50
+  }
+  ```
+- **Expected Status**: Error / Exception (e.g. `Counters row already exists for FY 99-00`).
+

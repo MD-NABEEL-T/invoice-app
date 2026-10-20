@@ -1,4 +1,17 @@
 # HANDOFF: GST Invoice App for Uncle's Business
+=== FINAL DECISIONS (these override anything written below) ===
+USERS: the uncle's son makes the bills; the uncle (older) mostly prints and may also make bills. Android phones only, English only, mobile-first with big buttons and text. One shared login that stays signed in on each phone.
+BUYER: one company, KH EXPORT INDIA PRIVATE LTD, with several branch addresses (pick one per bill); an "Add buyer" option must exist. All buyers are in Tamil Nadu: CGST + SGST only. NO IGST, no inter-state logic anywhere in the DB or UI.
+MONEY: integer paise; keep paise; NO rounding to the rupee. Tax per GST-rate group rounded once; CGST = floor(tax/2), SGST = remainder.
+NUMBERING: invoice no like 048/26-27 assigned automatically at save (atomic), financial year from the invoice date (April to March). The son sets the starting number once. Dates are real dates, default today, editable; warn if older than the latest bill.
+BILL FIELDS: buyer, branch, date, Buyer Order No (required, free text), Buyer Order Date (free text, may hold several dates), Delivery No (optional free text, can be blank or 0000), Delivery Date (default = bill date), Despatched Through (required, free text), Destination (optional), Terms of Delivery (optional). NO vehicle number.
+ITEMS: live in the DB, added as buyer orders come in. HSN is free text (warn if not 4, 6 or 8 digits). GST % per item, editable per line. Unit is free text with suggestions from past units. Rate prefills from the last bill and is editable. Nothing is ever invented: HSN and GST start blank and "needs checking" until the son confirms; the son supplies them from an Excel sheet we import.
+SAVED BILLS: never edited or deleted; only cancelled; a cancelled number is never reused. "Copy as new bill" exists.
+PRINT: A4 layout like the legacy bill (declaration line, "For Khansa Enterprises", "Customers Seal and Signature", "Authorised Signature" at the bottom). No bank details, no signature image. At print time ask how many copies (default 3, editable); the PDF contains one page per copy. The uncle's printer is wired to a laptop, so the flow is Share PDF from the phone via Gmail, then print on the laptop.
+MONTH END (Excel): (1) statement to the buyer like the HARDCOPY sheet: invoice no/date, DC no/date, PO no/date, taxable, rate, CGST, SGST, amount; (2) GST sales register like the GST sheet; (3) HSN-wise summary (HSN, qty, taxable, rate, CGST, SGST). Cancelled bills are excluded from totals.
+OLD BILLS: the app starts in November 2026; adding old bills is an optional later feature.
+AGENT WORKING STYLE: do one phase at a time, test it yourself, commit with a clear message, then report in at most 10 lines, with a FAIL list if anything is off.
+=== END FINAL DECISIONS ===
 
 ## 0. How to work with me (the user)
 - I'm Nabeel, a CSE student (final year) and a MERN developer (React + Vite, Node, Express, MongoDB). I also know Firebase, JWT, Tailwind and GSAP. I speak casually and directly, so straight talk is fine.
