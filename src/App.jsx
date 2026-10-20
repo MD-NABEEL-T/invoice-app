@@ -1,14 +1,43 @@
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext.jsx';
+import ProtectedRoute from './components/ProtectedRoute.jsx';
+import AppShell from './components/AppShell.jsx';
+import Login from './pages/Login.jsx';
+import Home from './pages/Home.jsx';
+import NewBill from './pages/NewBill.jsx';
+import Bills from './pages/Bills.jsx';
+import Reports from './pages/Reports.jsx';
+import More from './pages/More.jsx';
+
 export default function App() {
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-slate-800">
-      <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-sm border border-slate-200 text-center">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          Invoice App
-        </h1>
-        <p className="mt-2 text-sm text-slate-500">
-          Khansa Enterprises GST Invoicing
-        </p>
-      </div>
-    </div>
-  )
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Public Login Route */}
+          <Route path="/login" element={<Login />} />
+
+          {/* Protected App Routes inside AppShell */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <AppShell />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Home />} />
+            <Route path="new" element={<NewBill />} />
+            <Route path="bills" element={<Bills />} />
+            <Route path="reports" element={<Reports />} />
+            <Route path="more" element={<More />} />
+          </Route>
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
 }

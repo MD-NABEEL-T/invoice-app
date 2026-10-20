@@ -16,7 +16,9 @@
     "@tailwindcss/vite": "^4.3.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "tailwindcss": "^4.3.3"
+    "react-router-dom": "^7.18.4",
+    "tailwindcss": "^4.3.3",
+    "vite-plugin-pwa": "^2.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
