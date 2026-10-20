@@ -9,6 +9,10 @@ import NewBill from './pages/NewBill.jsx';
 import Bills from './pages/Bills.jsx';
 import Reports from './pages/Reports.jsx';
 import More from './pages/More.jsx';
+import Settings from './pages/Settings.jsx';
+import Buyers from './pages/Buyers.jsx';
+import Items from './pages/Items.jsx';
+import ItemImport from './pages/ItemImport.jsx';
 
 export default function App() {
   return (
@@ -32,6 +36,10 @@ export default function App() {
             <Route path="bills" element={<Bills />} />
             <Route path="reports" element={<Reports />} />
             <Route path="more" element={<More />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="buyers" element={<Buyers />} />
+            <Route path="items" element={<Items />} />
+            <Route path="items/import" element={<ItemImport />} />
           </Route>
 
           {/* Fallback */}

@@ -2,10 +2,14 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { formatRupees, formatDisplayDate, computeBillStats } from '../lib/billUtils.js';
+import { financialYear, formatInvoiceNo } from '../lib/tax.js';
 
 export default function Home() {
+  const currentFy = financialYear(new Date());
   const [firmName, setFirmName] = useState('KHANSA ENTERPRISES');
   const [invoices, setInvoices] = useState([]);
+  const [nextBillNo, setNextBillNo] = useState(null);
+  const [isNumberingSet, setIsNumberingSet] = useState(false);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -25,7 +29,29 @@ export default function Home() {
         setFirmName(firmData.name);
       }
 
-      // 2. Fetch Recent 20 Invoices (newest first)
+      // 2. Fetch Numbering Status for current FY
+      const { data: numData } = await supabase.rpc('get_numbering_status', { p_fy: currentFy });
+      if (numData?.is_set) {
+        setIsNumberingSet(true);
+        setNextBillNo(formatInvoiceNo(numData.last_number + 1, currentFy));
+      } else {
+        // Fallback: check counters table directly
+        const { data: counterRow } = await supabase
+          .from('counters')
+          .select('last_number')
+          .eq('fy', currentFy)
+          .maybeSingle();
+
+        if (counterRow) {
+          setIsNumberingSet(true);
+          setNextBillNo(formatInvoiceNo(counterRow.last_number + 1, currentFy));
+        } else {
+          setIsNumberingSet(false);
+          setNextBillNo(null);
+        }
+      }
+
+      // 3. Fetch Recent 20 Invoices (newest first)
       const { data: invData, error: invErr } = await supabase
         .from('invoices')
         .select('id, invoice_no, invoice_date, buyer_name, payable_paise, status, created_at')
@@ -43,7 +69,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentFy]);
 
   useEffect(() => {
     loadData();
@@ -55,12 +81,35 @@ export default function Home() {
     <div className="space-y-6">
       {/* Firm Header */}
       <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 shadow-sm">
-        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-          Supplier Business
-        </p>
-        <h2 className="text-2xl font-black text-slate-900 tracking-tight mt-0.5">
-          {firmName}
-        </h2>
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Supplier Business
+            </p>
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight mt-0.5">
+              {firmName}
+            </h2>
+          </div>
+          {isNumberingSet && nextBillNo && (
+            <div className="text-right">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                Next Bill
+              </span>
+              <span className="text-lg font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-xl border border-blue-200 inline-block mt-0.5">
+                {nextBillNo}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {!loading && !isNumberingSet && (
+          <div className="mt-3 pt-3 border-t border-slate-200 flex items-center justify-between text-xs sm:text-sm font-bold text-amber-900 bg-amber-50 p-2.5 rounded-xl border border-amber-300">
+            <span>Starting bill number not set for FY {currentFy}</span>
+            <Link to="/settings" className="underline font-black text-blue-800 ml-2">
+              Set in Settings &rarr;
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Prominent "New Bill" Button */}

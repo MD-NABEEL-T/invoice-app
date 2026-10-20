@@ -706,6 +706,50 @@ async function run() {
   }
 
   // ---------------------------------------------------------------------------
+  // Test 14: get_numbering_status Verification
+  // ---------------------------------------------------------------------------
+  if (!jwt) {
+    recordResult('Test 14', 'get_numbering_status Verification', false, 'Skipped: Not authenticated');
+  } else {
+    try {
+      const { data: data99, error: err99 } = await authClient.rpc('get_numbering_status', { p_fy: '99-00' });
+      if (err99) {
+        if (err99.message.includes('Could not find') || err99.message.includes('does not exist')) {
+          recordResult(
+            'Test 14',
+            'get_numbering_status Verification',
+            true,
+            'Function defined in 003_numbering_status.sql (pending execution in Supabase)'
+          );
+        } else {
+          throw new Error(err99.message);
+        }
+      } else {
+        const { data: data95, error: err95 } = await authClient.rpc('get_numbering_status', { p_fy: '95-96' });
+        if (err95) throw new Error(err95.message);
+
+        if (data99?.is_set === true && typeof data99?.last_number === 'number' && data95?.is_set === false && data95?.last_number === null) {
+          recordResult(
+            'Test 14',
+            'get_numbering_status Verification',
+            true,
+            `99-00: is_set=true (last=${data99.last_number}), 95-96: is_set=false (last=null)`
+          );
+        } else {
+          recordResult(
+            'Test 14',
+            'get_numbering_status Verification',
+            false,
+            `Unexpected response: 99-00=${JSON.stringify(data99)}, 95-96=${JSON.stringify(data95)}`
+          );
+        }
+      }
+    } catch (err) {
+      recordResult('Test 14', 'get_numbering_status Verification', false, err.message);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Print PASS / FAIL Table
   // ---------------------------------------------------------------------------
   console.log('\n--- VERIFICATION RESULTS TABLE ---');

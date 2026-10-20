@@ -87,30 +87,44 @@ export default function More() {
         </h3>
 
         <div className="bg-white rounded-2xl border-2 border-slate-300 divide-y-2 divide-slate-200 overflow-hidden shadow-sm">
-          {menuSections.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setSelectedItem(selectedItem === item.id ? null : item.id)}
-              className="w-full min-h-[58px] p-4 text-left flex items-center justify-between hover:bg-slate-50 active:bg-slate-100 transition"
-            >
-              <div className="flex items-center space-x-3.5">
-                <div className="p-2 rounded-xl bg-slate-100 shrink-0">
-                  {item.icon}
+          {menuSections.map((item) => {
+            const isClickableRoute = ['buyers', 'items', 'settings'].includes(item.id);
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  if (item.id === 'buyers') navigate('/buyers');
+                  else if (item.id === 'items') navigate('/items');
+                  else if (item.id === 'settings') navigate('/settings');
+                  else setSelectedItem(selectedItem === item.id ? null : item.id);
+                }}
+                className="w-full min-h-[58px] p-4 text-left flex items-center justify-between hover:bg-slate-50 active:bg-slate-100 transition"
+              >
+                <div className="flex items-center space-x-3.5">
+                  <div className="p-2 rounded-xl bg-slate-100 shrink-0">
+                    {item.icon}
+                  </div>
+                  <div>
+                    <p className="text-base font-bold text-slate-900">
+                      {item.title}
+                    </p>
+                    <p className="text-xs text-slate-500 font-medium">
+                      {item.desc}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-base font-bold text-slate-900">
-                    {item.title}
-                  </p>
-                  <p className="text-xs text-slate-500 font-medium">
-                    {item.desc}
-                  </p>
-                </div>
-              </div>
-              <span className="text-xs font-bold px-2 py-1 bg-slate-100 text-slate-600 rounded-lg shrink-0">
-                Coming Soon
-              </span>
-            </button>
-          ))}
+                {isClickableRoute ? (
+                  <span className="text-slate-400 font-black text-xl px-1">
+                    ›
+                  </span>
+                ) : (
+                  <span className="text-xs font-bold px-2 py-1 bg-slate-100 text-slate-600 rounded-lg shrink-0">
+                    Coming Soon
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 

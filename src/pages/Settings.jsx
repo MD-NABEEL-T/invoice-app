@@ -1,0 +1,471 @@
+import React, { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import { supabase } from '../lib/supabase.js';
+import { financialYear, formatInvoiceNo } from '../lib/tax.js';
+import { validateGSTIN } from '../lib/itemValidation.js';
+
+export default function Settings() {
+  const currentFy = financialYear(new Date());
+
+  // Firm Profile State
+  const [firm, setFirm] = useState({
+    name: '',
+    address: '',
+    phone: '',
+    email: '',
+    gstin: '',
+    declaration: '',
+  });
+  const [firmLoading, setFirmLoading] = useState(true);
+  const [firmSaving, setFirmSaving] = useState(false);
+  const [firmSuccessMsg, setFirmSuccessMsg] = useState('');
+  const [firmErrorMsg, setFirmErrorMsg] = useState('');
+  const [gstinWarning, setGstinWarning] = useState(null);
+
+  // Numbering Status State
+  const [numbering, setNumbering] = useState({ isSet: false, lastNumber: null });
+  const [numberingLoading, setNumberingLoading] = useState(true);
+  const [startNumberInput, setStartNumberInput] = useState('');
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [numberingSaving, setNumberingSaving] = useState(false);
+  const [numberingMsg, setNumberingMsg] = useState({ type: '', text: '' });
+
+  // 1. Load Firm Profile
+  const loadFirmProfile = useCallback(async () => {
+    setFirmLoading(true);
+    setFirmErrorMsg('');
+    try {
+      const { data, error } = await supabase
+        .from('firm_profile')
+        .select('name, address, phone, email, gstin, declaration')
+        .eq('id', 1)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data) {
+        setFirm({
+          name: data.name || '',
+          address: data.address || '',
+          phone: data.phone || '',
+          email: data.email || '',
+          gstin: data.gstin || '',
+          declaration: data.declaration || '',
+        });
+        if (data.gstin) {
+          const val = validateGSTIN(data.gstin);
+          setGstinWarning(val.warning);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading firm profile:', err);
+      setFirmErrorMsg(err.message || 'Could not load firm profile.');
+    } finally {
+      setFirmLoading(false);
+    }
+  }, []);
+
+  // 2. Load FY Numbering Status
+  const loadNumberingStatus = useCallback(async () => {
+    setNumberingLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('get_numbering_status', { p_fy: currentFy });
+      if (!error && data) {
+        setNumbering({
+          isSet: Boolean(data.is_set),
+          lastNumber: data.last_number !== undefined ? data.last_number : null,
+        });
+      } else {
+        // Fallback: Check if counters row exists
+        const { data: counterData } = await supabase
+          .from('counters')
+          .select('last_number')
+          .eq('fy', currentFy)
+          .maybeSingle();
+
+        if (counterData) {
+          setNumbering({ isSet: true, lastNumber: counterData.last_number });
+        } else {
+          setNumbering({ isSet: false, lastNumber: null });
+        }
+      }
+    } catch (err) {
+      console.error('Error loading numbering status:', err);
+    } finally {
+      setNumberingLoading(false);
+    }
+  }, [currentFy]);
+
+  useEffect(() => {
+    loadFirmProfile();
+    loadNumberingStatus();
+  }, [loadFirmProfile, loadNumberingStatus]);
+
+  // Handle Firm Profile Save
+  const handleSaveFirm = async (e) => {
+    e.preventDefault();
+    setFirmSaving(true);
+    setFirmSuccessMsg('');
+    setFirmErrorMsg('');
+
+    try {
+      const { error } = await supabase
+        .from('firm_profile')
+        .update({
+          name: firm.name.trim(),
+          address: firm.address.trim(),
+          phone: firm.phone.trim() || null,
+          email: firm.email.trim() || null,
+          gstin: firm.gstin.trim().toUpperCase(),
+          declaration: firm.declaration.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', 1);
+
+      if (error) throw error;
+      setFirmSuccessMsg('Firm profile updated successfully!');
+      setTimeout(() => setFirmSuccessMsg(''), 4000);
+    } catch (err) {
+      setFirmErrorMsg(err.message || 'Failed to update firm profile.');
+    } finally {
+      setFirmSaving(false);
+    }
+  };
+
+  // Handle Set Starting Number
+  const handleConfirmStartingNumber = async () => {
+    const num = parseInt(startNumberInput, 10);
+    if (isNaN(num) || num < 0) {
+      setNumberingMsg({ type: 'error', text: 'Please enter a valid starting number (0 or higher).' });
+      setShowConfirmModal(false);
+      return;
+    }
+
+    setNumberingSaving(true);
+    setNumberingMsg({ type: '', text: '' });
+
+    try {
+      const { error } = await supabase.rpc('set_starting_number', {
+        p_fy: currentFy,
+        p_last_used: num,
+      });
+
+      if (error) throw error;
+
+      setNumberingMsg({
+        type: 'success',
+        text: `Starting number set to ${num} for FY ${currentFy}! Next bill will be ${formatInvoiceNo(num + 1, currentFy)}.`,
+      });
+      setShowConfirmModal(false);
+      setStartNumberInput('');
+      await loadNumberingStatus();
+    } catch (err) {
+      setNumberingMsg({
+        type: 'error',
+        text: err.message || 'Could not set starting number. It may already be set.',
+      });
+      setShowConfirmModal(false);
+    } finally {
+      setNumberingSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Top Breadcrumb Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+            Settings
+          </h2>
+          <p className="text-sm font-medium text-slate-500">
+            Business details and invoice series
+          </p>
+        </div>
+        <Link
+          to="/more"
+          className="text-sm font-bold text-slate-700 bg-white border border-slate-300 px-3 py-1.5 rounded-xl hover:bg-slate-50"
+        >
+          &larr; More Menu
+        </Link>
+      </div>
+
+      {/* CARD 1: INVOICE NUMBERING SERIES */}
+      <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+          <div>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Financial Year {currentFy}
+            </span>
+            <h3 className="text-xl font-black text-slate-900 mt-0.5">
+              Invoice Numbering Series
+            </h3>
+          </div>
+          {numbering.isSet ? (
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-400">
+              Series Active
+            </span>
+          ) : (
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-400">
+              Not Set
+            </span>
+          )}
+        </div>
+
+        {numberingMsg.text && (
+          <div
+            className={`p-4 rounded-xl border-2 text-base font-bold ${
+              numberingMsg.type === 'error'
+                ? 'bg-red-50 border-red-500 text-red-900'
+                : 'bg-emerald-50 border-emerald-500 text-emerald-900'
+            }`}
+          >
+            {numberingMsg.text}
+          </div>
+        )}
+
+        {numberingLoading ? (
+          <div className="py-4 text-center text-slate-500 font-semibold">
+            Checking numbering status...
+          </div>
+        ) : numbering.isSet ? (
+          /* Series is Already Set */
+          <div className="bg-slate-50 rounded-xl border-2 border-slate-200 p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold text-slate-600">Last Bill Number Used:</span>
+              <span className="text-lg font-black text-slate-900">{numbering.lastNumber}</span>
+            </div>
+            <div className="flex items-center justify-between pt-1 border-t border-slate-200">
+              <span className="text-sm font-bold text-slate-600">Next Bill to be Generated:</span>
+              <span className="text-xl font-black text-blue-700">
+                {formatInvoiceNo((numbering.lastNumber ?? 0) + 1, currentFy)}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 pt-2 font-medium">
+              Permanent setting: GST sequential series is locked and increments automatically with every saved bill.
+            </p>
+          </div>
+        ) : (
+          /* Series NOT set yet */
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-amber-50 border-2 border-amber-400 text-amber-950 text-sm font-medium leading-relaxed">
+              <p className="font-bold text-base mb-1 text-amber-900">
+                Starting number required before creating bills:
+              </p>
+              Enter the last invoice number already used this financial year in your Excel bills. If you are starting fresh from invoice 001, enter <strong>0</strong>. If you already issued bills up to 047 in Excel, enter <strong>47</strong>.
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setShowConfirmModal(true);
+              }}
+              className="space-y-3"
+            >
+              <div>
+                <label htmlFor="startNum" className="block text-base font-bold text-slate-900 mb-1">
+                  Last Invoice Number Used in FY {currentFy}
+                </label>
+                <input
+                  id="startNum"
+                  type="number"
+                  min="0"
+                  step="1"
+                  required
+                  value={startNumberInput}
+                  onChange={(e) => setStartNumberInput(e.target.value)}
+                  placeholder="e.g. 0 or 47"
+                  className="w-full min-h-[50px] px-4 py-3 rounded-xl border-2 border-slate-400 bg-white text-slate-900 text-lg font-bold focus:outline-none focus:border-slate-900"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={numberingSaving || startNumberInput === ''}
+                className="w-full min-h-[50px] px-6 py-3 rounded-xl bg-slate-900 text-white font-bold text-lg hover:bg-slate-800 disabled:opacity-50"
+              >
+                Set Starting Number
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
+
+      {/* CONFIRMATION DIALOG MODAL */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border-2 border-slate-900 max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h4 className="text-xl font-black text-slate-900 text-center">
+              Confirm Starting Number
+            </h4>
+            <div className="text-base font-semibold text-slate-700 text-center leading-relaxed">
+              Are you sure you want to set the last used number to <span className="font-black text-slate-950 text-lg">"{startNumberInput}"</span> for FY <span className="font-black text-slate-950">{currentFy}</span>?
+              <p className="mt-2 text-sm text-red-700 font-bold">
+                WARNING: This starting number can only be set ONCE and can never be changed or reset afterwards.
+              </p>
+            </div>
+            <div className="flex space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 min-h-[48px] px-4 py-2.5 rounded-xl border-2 border-slate-400 font-bold text-slate-700 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmStartingNumber}
+                disabled={numberingSaving}
+                className="flex-1 min-h-[48px] px-4 py-2.5 rounded-xl bg-blue-700 text-white font-black hover:bg-blue-800"
+              >
+                {numberingSaving ? 'Saving...' : 'Yes, Set It'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CARD 2: FIRM PROFILE EDITING */}
+      <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="border-b border-slate-200 pb-3">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            Supplier Firm
+          </span>
+          <h3 className="text-xl font-black text-slate-900 mt-0.5">
+            Business Details
+          </h3>
+        </div>
+
+        {firmSuccessMsg && (
+          <div className="p-4 rounded-xl bg-emerald-50 border-2 border-emerald-500 text-emerald-900 text-base font-bold">
+            {firmSuccessMsg}
+          </div>
+        )}
+        {firmErrorMsg && (
+          <div className="p-4 rounded-xl bg-red-50 border-2 border-red-500 text-red-900 text-base font-bold">
+            {firmErrorMsg}
+          </div>
+        )}
+
+        {firmLoading ? (
+          <div className="py-6 text-center text-slate-500 font-semibold">
+            Loading business profile...
+          </div>
+        ) : (
+          <form onSubmit={handleSaveFirm} className="space-y-4">
+            {/* Firm Name */}
+            <div>
+              <label htmlFor="firmName" className="block text-base font-bold text-slate-900 mb-1">
+                Firm Name *
+              </label>
+              <input
+                id="firmName"
+                type="text"
+                required
+                value={firm.name}
+                onChange={(e) => setFirm({ ...firm, name: e.target.value })}
+                className="w-full min-h-[50px] px-4 py-3 rounded-xl border-2 border-slate-400 bg-white text-slate-900 text-lg font-semibold focus:border-slate-900"
+              />
+            </div>
+
+            {/* Address */}
+            <div>
+              <label htmlFor="firmAddress" className="block text-base font-bold text-slate-900 mb-1">
+                Address *
+              </label>
+              <textarea
+                id="firmAddress"
+                rows="3"
+                required
+                value={firm.address}
+                onChange={(e) => setFirm({ ...firm, address: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl border-2 border-slate-400 bg-white text-slate-900 text-base font-semibold focus:border-slate-900"
+              ></textarea>
+            </div>
+
+            {/* GSTIN */}
+            <div>
+              <label htmlFor="firmGstin" className="block text-base font-bold text-slate-900 mb-1">
+                Firm GSTIN *
+              </label>
+              <input
+                id="firmGstin"
+                type="text"
+                required
+                value={firm.gstin}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase();
+                  setFirm({ ...firm, gstin: val });
+                  const check = validateGSTIN(val);
+                  setGstinWarning(check.warning);
+                }}
+                className="w-full min-h-[50px] px-4 py-3 rounded-xl border-2 border-slate-400 bg-white text-slate-900 text-lg font-mono font-bold focus:border-slate-900 uppercase"
+              />
+              {gstinWarning && (
+                <p className="mt-1.5 text-sm font-bold text-amber-700 flex items-center gap-1">
+                  <span>⚠️</span> {gstinWarning}
+                </p>
+              )}
+            </div>
+
+            {/* Phone & Email */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="firmPhone" className="block text-base font-bold text-slate-900 mb-1">
+                  Phone
+                </label>
+                <input
+                  id="firmPhone"
+                  type="text"
+                  value={firm.phone}
+                  onChange={(e) => setFirm({ ...firm, phone: e.target.value })}
+                  className="w-full min-h-[50px] px-4 py-3 rounded-xl border-2 border-slate-400 bg-white text-slate-900 text-base font-semibold focus:border-slate-900"
+                />
+              </div>
+              <div>
+                <label htmlFor="firmEmail" className="block text-base font-bold text-slate-900 mb-1">
+                  Email
+                </label>
+                <input
+                  id="firmEmail"
+                  type="email"
+                  value={firm.email}
+                  onChange={(e) => setFirm({ ...firm, email: e.target.value })}
+                  className="w-full min-h-[50px] px-4 py-3 rounded-xl border-2 border-slate-400 bg-white text-slate-900 text-base font-semibold focus:border-slate-900"
+                />
+              </div>
+            </div>
+
+            {/* Declaration */}
+            <div>
+              <label htmlFor="firmDeclaration" className="block text-base font-bold text-slate-900 mb-1">
+                Bill Declaration Text *
+              </label>
+              <textarea
+                id="firmDeclaration"
+                rows="2"
+                required
+                value={firm.declaration}
+                onChange={(e) => setFirm({ ...firm, declaration: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl border-2 border-slate-400 bg-white text-slate-900 text-sm font-semibold focus:border-slate-900"
+              ></textarea>
+            </div>
+
+            {/* Save Button */}
+            <button
+              type="submit"
+              disabled={firmSaving}
+              className="w-full min-h-[52px] px-6 py-3.5 rounded-xl bg-slate-900 text-white font-bold text-lg hover:bg-slate-800 disabled:opacity-50"
+            >
+              {firmSaving ? 'Saving Profile...' : 'Save Business Profile'}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
