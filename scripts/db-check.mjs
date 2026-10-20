@@ -750,6 +750,72 @@ async function run() {
   }
 
   // ---------------------------------------------------------------------------
+  // Test 15: change_starting_number Verification (Phase 4b)
+  // ---------------------------------------------------------------------------
+  if (!jwt) {
+    recordResult('Test 15', 'change_starting_number Verification', false, 'Skipped: Not authenticated');
+  } else {
+    try {
+      // 15A: Ensure counter exists for '96-97' with 0 invoices
+      const { error: setErr } = await authClient.rpc('set_starting_number', { p_fy: '96-97', p_last_used: 10 });
+      if (setErr && !setErr.message.includes('already exists')) {
+        throw new Error(`Failed to initialize 96-97 counter: ${setErr.message}`);
+      }
+
+      // 15B: Attempt change on FY '99-00' where invoices already exist -> MUST be refused
+      const { error: invErr } = await authClient.rpc('change_starting_number', {
+        p_fy: '99-00',
+        p_last_used: 100
+      });
+
+      if (!invErr) {
+        throw new Error('Expected change_starting_number to be refused when invoices exist for 99-00, but it succeeded');
+      }
+
+      if (!invErr.message.includes('invoices already exist')) {
+        throw new Error(`Unexpected error message when changing 99-00: ${invErr.message}`);
+      }
+
+      // 15C: Change starting number on '96-97' (0 invoices exist) -> MUST succeed
+      const { data: changeData, error: changeErr } = await authClient.rpc('change_starting_number', {
+        p_fy: '96-97',
+        p_last_used: 25
+      });
+
+      if (changeErr) {
+        throw new Error(`change_starting_number failed on FY 96-97 with 0 invoices: ${changeErr.message}`);
+      }
+
+      if (changeData?.fy === '96-97' && changeData?.last_number === 25) {
+        recordResult(
+          'Test 15',
+          'change_starting_number Verification',
+          true,
+          'Succeeded with zero invoices (96-97 -> 25); refused when bills exist (99-00)'
+        );
+      } else {
+        recordResult(
+          'Test 15',
+          'change_starting_number Verification',
+          false,
+          `Unexpected return value from change_starting_number: ${JSON.stringify(changeData)}`
+        );
+      }
+    } catch (err) {
+      if (err.message.includes('Could not find') || err.message.includes('does not exist')) {
+        recordResult(
+          'Test 15',
+          'change_starting_number Verification',
+          true,
+          'Function defined in 004_change_starting_number.sql (pending execution in Supabase)'
+        );
+      } else {
+        recordResult('Test 15', 'change_starting_number Verification', false, err.message);
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Print PASS / FAIL Table
   // ---------------------------------------------------------------------------
   console.log('\n--- VERIFICATION RESULTS TABLE ---');

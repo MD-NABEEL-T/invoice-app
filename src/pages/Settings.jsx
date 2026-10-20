@@ -24,9 +24,13 @@ export default function Settings() {
 
   // Numbering Status State
   const [numbering, setNumbering] = useState({ isSet: false, lastNumber: null });
+  const [hasBillsInFy, setHasBillsInFy] = useState(false);
   const [numberingLoading, setNumberingLoading] = useState(true);
   const [startNumberInput, setStartNumberInput] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showChangeModal, setShowChangeModal] = useState(false);
+  const [changeNumberInput, setChangeNumberInput] = useState('');
+  const [changingNumber, setChangingNumber] = useState(false);
   const [numberingSaving, setNumberingSaving] = useState(false);
   const [numberingMsg, setNumberingMsg] = useState({ type: '', text: '' });
 
@@ -64,10 +68,18 @@ export default function Settings() {
     }
   }, []);
 
-  // 2. Load FY Numbering Status
+  // 2. Load FY Numbering Status & Check if Bills Exist
   const loadNumberingStatus = useCallback(async () => {
     setNumberingLoading(true);
     try {
+      // Check if bills already exist in this FY
+      const { count: billCount } = await supabase
+        .from('invoices')
+        .select('id', { count: 'exact', head: true })
+        .eq('fy', currentFy);
+
+      setHasBillsInFy(Boolean(billCount && billCount > 0));
+
       const { data, error } = await supabase.rpc('get_numbering_status', { p_fy: currentFy });
       if (!error && data) {
         setNumbering({
@@ -169,6 +181,44 @@ export default function Settings() {
     }
   };
 
+  // Handle Change Starting Number (Phase 4b)
+  const handleConfirmChangeNumber = async () => {
+    const num = parseInt(changeNumberInput, 10);
+    if (isNaN(num) || num < 0) {
+      setNumberingMsg({ type: 'error', text: 'Please enter a valid starting number (0 or higher).' });
+      setShowChangeModal(false);
+      return;
+    }
+
+    setChangingNumber(true);
+    setNumberingMsg({ type: '', text: '' });
+
+    try {
+      const { error } = await supabase.rpc('change_starting_number', {
+        p_fy: currentFy,
+        p_last_used: num,
+      });
+
+      if (error) throw error;
+
+      setNumberingMsg({
+        type: 'success',
+        text: `Starting number updated to ${num} for FY ${currentFy}! Next bill will be ${formatInvoiceNo(num + 1, currentFy)}.`,
+      });
+      setShowChangeModal(false);
+      setChangeNumberInput('');
+      await loadNumberingStatus();
+    } catch (err) {
+      setNumberingMsg({
+        type: 'error',
+        text: err.message || 'Could not change starting number.',
+      });
+      setShowChangeModal(false);
+    } finally {
+      setChangingNumber(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Breadcrumb Header */}
@@ -229,10 +279,10 @@ export default function Settings() {
           </div>
         ) : numbering.isSet ? (
           /* Series is Already Set */
-          <div className="bg-slate-50 rounded-xl border-2 border-slate-200 p-4 space-y-2">
+          <div className="bg-slate-50 rounded-xl border-2 border-slate-200 p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm font-bold text-slate-600">Last Bill Number Used:</span>
-              <span className="text-lg font-black text-slate-900">{numbering.lastNumber}</span>
+              <span className="text-xl font-black text-slate-900">{numbering.lastNumber}</span>
             </div>
             <div className="flex items-center justify-between pt-1 border-t border-slate-200">
               <span className="text-sm font-bold text-slate-600">Next Bill to be Generated:</span>
@@ -240,9 +290,33 @@ export default function Settings() {
                 {formatInvoiceNo((numbering.lastNumber ?? 0) + 1, currentFy)}
               </span>
             </div>
-            <p className="text-xs text-slate-500 pt-2 font-medium">
-              Permanent setting: GST sequential series is locked and increments automatically with every saved bill.
-            </p>
+
+            {hasBillsInFy ? (
+              <div className="pt-2 border-t border-slate-200 flex items-center space-x-2 text-slate-700">
+                <svg className="w-5 h-5 text-slate-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <span className="text-sm font-bold text-slate-800">
+                  Locked because bills have been made
+                </span>
+              </div>
+            ) : (
+              <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <p className="text-xs text-slate-500 font-medium">
+                  No bills created yet in FY {currentFy}. You can change the starting number if needed.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setChangeNumberInput(String(numbering.lastNumber ?? 0));
+                    setShowChangeModal(true);
+                  }}
+                  className="min-h-[48px] px-4 py-2 rounded-xl bg-white border-2 border-blue-600 text-blue-700 font-black text-sm hover:bg-blue-50 active:bg-blue-100 transition shrink-0"
+                >
+                  Change number
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           /* Series NOT set yet */
@@ -304,8 +378,8 @@ export default function Settings() {
             </h4>
             <div className="text-base font-semibold text-slate-700 text-center leading-relaxed">
               Are you sure you want to set the last used number to <span className="font-black text-slate-950 text-lg">"{startNumberInput}"</span> for FY <span className="font-black text-slate-950">{currentFy}</span>?
-              <p className="mt-2 text-sm text-red-700 font-bold">
-                WARNING: This starting number can only be set ONCE and can never be changed or reset afterwards.
+              <p className="mt-2 text-sm text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-300 font-bold">
+                Note: You can adjust this number until your first bill is made. Once any bill exists, it is permanently locked.
               </p>
             </div>
             <div className="flex space-x-3 pt-2">
@@ -323,6 +397,57 @@ export default function Settings() {
                 className="flex-1 min-h-[48px] px-4 py-2.5 rounded-xl bg-blue-700 text-white font-black hover:bg-blue-800"
               >
                 {numberingSaving ? 'Saving...' : 'Yes, Set It'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMATION DIALOG MODAL FOR CHANGING STARTING NUMBER */}
+      {showChangeModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border-2 border-slate-900 max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center mx-auto">
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </div>
+            <h4 className="text-xl font-black text-slate-900 text-center">
+              Change Starting Number
+            </h4>
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-slate-700">
+                Enter the updated last invoice number used before generating bills in FY <strong>{currentFy}</strong>:
+              </p>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                required
+                value={changeNumberInput}
+                onChange={(e) => setChangeNumberInput(e.target.value)}
+                placeholder="e.g. 0 or 47"
+                className="w-full min-h-[50px] px-4 py-3 rounded-xl border-2 border-slate-400 bg-white text-slate-900 text-xl font-black focus:outline-none focus:border-slate-900"
+              />
+              <p className="text-xs text-amber-800 bg-amber-50 p-2.5 rounded-lg border border-amber-300 font-bold">
+                Confirmation: This change is only allowed while zero bills exist in FY {currentFy}. Once bills are created, this series will be locked.
+              </p>
+            </div>
+            <div className="flex space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowChangeModal(false)}
+                className="flex-1 min-h-[48px] px-4 py-2.5 rounded-xl border-2 border-slate-400 font-bold text-slate-700 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmChangeNumber}
+                disabled={changingNumber || changeNumberInput === ''}
+                className="flex-1 min-h-[48px] px-4 py-2.5 rounded-xl bg-blue-700 text-white font-black hover:bg-blue-800 disabled:opacity-50"
+              >
+                {changingNumber ? 'Updating...' : 'Confirm Change'}
               </button>
             </div>
           </div>

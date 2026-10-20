@@ -140,12 +140,25 @@ export default function Buyers() {
   const handleSaveBranch = async (e) => {
     e.preventDefault();
     if (!selectedBuyer) return;
+
+    const trimmedAddress = branchModal.address.trim();
+    if (!trimmedAddress) {
+      alert('Branch delivery address cannot be blank. Please enter the full delivery address.');
+      return;
+    }
+
+    const trimmedLabel = branchModal.label.trim();
+    if (!trimmedLabel) {
+      alert('Branch label cannot be blank.');
+      return;
+    }
+
     setSavingBranch(true);
     try {
       const payload = {
         buyer_id: selectedBuyer.id,
-        label: branchModal.label.trim(),
-        address: branchModal.address.trim(),
+        label: trimmedLabel,
+        address: trimmedAddress,
         updated_at: new Date().toISOString(),
       };
 
@@ -197,19 +210,27 @@ export default function Buyers() {
             Customer companies and delivery addresses
           </p>
         </div>
-        <button
-          onClick={() => {
-            setBuyerModal({ isOpen: true, mode: 'add', id: null, name: '', gstin: '', state_code: '33' });
-            setBuyerWarning(null);
-          }}
-          className="min-h-[48px] px-4 py-2.5 rounded-xl bg-blue-700 text-white font-bold text-base hover:bg-blue-800 shadow-sm flex items-center space-x-1.5"
+        <Link
+          to="/more"
+          className="text-sm font-bold text-slate-700 bg-white border border-slate-300 px-3 py-1.5 rounded-xl hover:bg-slate-50"
         >
-          <svg className="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          <span>Add Buyer</span>
-        </button>
+          &larr; More Menu
+        </Link>
       </div>
+
+      {/* Prominent Add New Buyer Button */}
+      <button
+        onClick={() => {
+          setBuyerModal({ isOpen: true, mode: 'add', id: null, name: '', gstin: '', state_code: '33' });
+          setBuyerWarning(null);
+        }}
+        className="w-full min-h-[54px] px-6 py-3.5 rounded-2xl bg-blue-700 text-white font-black text-lg hover:bg-blue-800 active:bg-blue-900 shadow-md flex items-center justify-center space-x-2 transition"
+      >
+        <svg className="w-6 h-6 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+        <span>Add New Buyer</span>
+      </button>
 
       {errorMsg && (
         <div className="p-4 rounded-xl bg-red-50 border-2 border-red-500 text-red-900 font-bold">
@@ -307,20 +328,28 @@ export default function Buyers() {
 
                 {/* EXPANDED BRANCHES SECTION */}
                 {isSelected && (
-                  <div className="mt-4 pt-4 border-t-2 border-dashed border-slate-300 space-y-3">
+                  <div className="mt-4 pt-4 border-t-2 border-dashed border-slate-300 space-y-4">
                     <div className="flex items-center justify-between">
                       <h4 className="text-base font-black text-slate-900">
                         Branches for {b.name}
                       </h4>
-                      <button
-                        onClick={() => {
-                          setBranchModal({ isOpen: true, mode: 'add', id: null, label: '', address: '' });
-                        }}
-                        className="text-xs font-bold bg-blue-700 text-white px-3 py-1.5 rounded-lg hover:bg-blue-800"
-                      >
-                        + Add Branch
-                      </button>
+                      <span className="text-xs font-bold text-slate-500">
+                        {branches.length} {branches.length === 1 ? 'address' : 'addresses'}
+                      </span>
                     </div>
+
+                    {/* Prominent Add Branch Address Button */}
+                    <button
+                      onClick={() => {
+                        setBranchModal({ isOpen: true, mode: 'add', id: null, label: '', address: '' });
+                      }}
+                      className="w-full min-h-[50px] px-4 py-3 rounded-xl bg-blue-50 border-2 border-blue-600 text-blue-800 font-black text-base hover:bg-blue-100 active:bg-blue-200 flex items-center justify-center space-x-2 transition shadow-xs"
+                    >
+                      <svg className="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                      <span>Add Branch Address</span>
+                    </button>
 
                     {branchesLoading ? (
                       <p className="text-sm text-slate-500 font-semibold py-2">Loading branches...</p>

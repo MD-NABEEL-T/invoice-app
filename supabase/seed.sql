@@ -117,23 +117,10 @@ MELVISHARAM-632509',
         WHERE buyer_id = v_buyer_id AND label = 'Branch 2';
     END IF;
 
-    -- Branch 3: label 'Branch 3' and address 'ADDRESS PENDING'
-    IF NOT EXISTS (
-        SELECT 1 FROM public.buyer_addresses
-        WHERE buyer_id = v_buyer_id AND label = 'Branch 3'
-    ) THEN
-        INSERT INTO public.buyer_addresses (buyer_id, label, address, active)
-        VALUES (
-            v_buyer_id,
-            'Branch 3',
-            'ADDRESS PENDING',
-            true
-        );
-    ELSE
-        UPDATE public.buyer_addresses
-        SET address = 'ADDRESS PENDING',
-            active = true,
-            updated_at = now()
-        WHERE buyer_id = v_buyer_id AND label = 'Branch 3';
-    END IF;
+    -- Deactivate legacy Branch 3 placeholder if it exists (Phase 4b)
+    UPDATE public.buyer_addresses
+    SET active = false,
+        updated_at = now()
+    WHERE buyer_id = v_buyer_id 
+      AND (label = 'Branch 3' OR address ILIKE '%ADDRESS PENDING%');
 END $$;

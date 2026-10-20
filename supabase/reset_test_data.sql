@@ -18,24 +18,24 @@ BEGIN
     SELECT COUNT(*)
     INTO v_live_invoice_count
     FROM public.invoices
-    WHERE fy NOT IN ('98-99', '99-00');
+    WHERE fy NOT IN ('96-97', '98-99', '99-00');
 
     IF v_live_invoice_count > 0 THEN
-        RAISE EXCEPTION 'SAFETY GUARD TRIGGERED: % live invoice(s) found with fy NOT IN (''98-99'', ''99-00''). Truncate aborted to protect production data!', v_live_invoice_count;
+        RAISE EXCEPTION 'SAFETY GUARD TRIGGERED: % live invoice(s) found with fy NOT IN (''96-97'', ''98-99'', ''99-00''). Truncate aborted to protect production data!', v_live_invoice_count;
     END IF;
 
     -- Guard 2: Verify no non-test counters exist
     SELECT COUNT(*)
     INTO v_live_counter_count
     FROM public.counters
-    WHERE fy NOT IN ('98-99', '99-00');
+    WHERE fy NOT IN ('96-97', '98-99', '99-00');
 
     IF v_live_counter_count > 0 THEN
-        RAISE EXCEPTION 'SAFETY GUARD TRIGGERED: % live counter(s) found with fy NOT IN (''98-99'', ''99-00''). Truncate aborted to protect production data!', v_live_counter_count;
+        RAISE EXCEPTION 'SAFETY GUARD TRIGGERED: % live counter(s) found with fy NOT IN (''96-97'', ''98-99'', ''99-00''). Truncate aborted to protect production data!', v_live_counter_count;
     END IF;
 
     -- Safe to truncate: clears invoice_lines (via CASCADE or explicit), invoices, and counters
     TRUNCATE TABLE public.invoice_lines, public.invoices, public.counters RESTART IDENTITY CASCADE;
 
-    RAISE NOTICE 'Test data for fy (''98-99'', ''99-00'') has been safely cleared.';
+    RAISE NOTICE 'Test data for fy (''96-97'', ''98-99'', ''99-00'') has been safely cleared.';
 END $$;
