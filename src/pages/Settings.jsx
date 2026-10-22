@@ -649,6 +649,14 @@ export default function Settings() {
           </button>
         </div>
       </div>
+
+      {/* App Version Info Footer */}
+      <div className="pt-4 pb-2 text-center text-xs font-semibold text-slate-500">
+        <p>Khansa Enterprises &bull; GST Invoicing App</p>
+        <p className="font-mono text-xs text-slate-600 mt-1">
+          App version: <span className="font-bold text-slate-900 bg-slate-200 px-2 py-0.5 rounded">{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'}</span>
+        </p>
+      </div>
     </div>
   );
 }

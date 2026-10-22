@@ -14,6 +14,7 @@ import Settings from './pages/Settings.jsx';
 import Buyers from './pages/Buyers.jsx';
 import Items from './pages/Items.jsx';
 import ItemImport from './pages/ItemImport.jsx';
+import PwaUpdateBanner from './components/PwaUpdateBanner.jsx';
 
 // Dev-only route for fixture and print layout testing (excluded in production build)
 const DevPrintSample = import.meta.env.DEV
@@ -24,6 +25,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <PwaUpdateBanner />
         <Routes>
           {/* Public Login Route */}
           <Route path="/login" element={<Login />} />

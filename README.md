@@ -23,7 +23,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
-## 2. Opening on Android Phone over the Same Wi-Fi
+## 2. Opening on Android Phone over Same Wi-Fi
 
 To test and install the PWA on an Android phone (Chrome):
 
@@ -31,10 +31,6 @@ To test and install the PWA on an Android phone (Chrome):
 2. **Start Vite with the host flag**:
    ```bash
    npm run dev -- --host
-   ```
-   Or:
-   ```bash
-   npx vite --host
    ```
 3. Look at the terminal output under **Network**. You will see a URL like:
    ```text
@@ -50,33 +46,46 @@ To test and install the PWA on an Android phone (Chrome):
 
 ## 3. How to Deploy (Cloudflare Pages)
 
-The app is built with Vite and pure client-side routing, making it zero-cost and ideal for **Cloudflare Pages** (avoiding Vercel Hobby commercial limitations):
+The app is built with Vite, Tailwind CSS, and pure client-side routing, making it completely zero-cost and ideal for **Cloudflare Pages** (avoiding Vercel Hobby commercial limitations):
+
+### Step-by-Step Cloudflare Pages Setup:
 
 1. **Push your code** to your GitHub repository `invoice-app`.
 2. Log in to the [Cloudflare Dashboard](https://dash.cloudflare.com/) &rarr; **Workers & Pages** &rarr; **Create application** &rarr; **Pages** &rarr; **Connect to Git**.
 3. Select your `invoice-app` repository and configure the build settings:
-   - **Framework preset**: `Vite`
+   - **Framework preset**: `Vite` (or None)
    - **Build command**: `npm run build`
    - **Build output directory**: `dist`
-4. In **Environment variables (production)**, add:
-   - `VITE_SUPABASE_URL`: Your Supabase project URL
+4. In **Environment variables (production)**, add the following variables:
+   - `VITE_SUPABASE_URL`: Your Supabase project URL (e.g. `https://xxxx.supabase.co`)
    - `VITE_SUPABASE_PUBLISHABLE_KEY`: Your Supabase publishable/anon key
-5. Tap **Save and Deploy**.
-6. Under **Pages** &rarr; **Custom Domains**, connect your free or custom domain (e.g. `invoice.khansa.example` or Cloudflare `.pages.dev` subdomain).
+   - `NODE_VERSION`: `22` (Note: `.node-version` file in root also specifies `22`)
+5. **CRITICAL SECURITY NOTE**:
+   > **DO NOT ADD SECRET KEYS**: Never add `SUPABASE_SERVICE_ROLE_KEY` or any database secret keys to Cloudflare Pages environment variables. Any environment variable starting with `VITE_` is baked directly into the public client-side JavaScript bundle and is readable by anyone using browser DevTools. Only the Supabase publishable/anon key (`VITE_SUPABASE_PUBLISHABLE_KEY`) is safe to include. Database access is strictly secured via Supabase Postgres Row-Level Security (RLS) policies and authentication.
+6. Tap **Save and Deploy**.
+7. Under **Pages** &rarr; **Custom Domains**, connect your free or custom domain (e.g. `invoice.khansa.example` or your Cloudflare `.pages.dev` subdomain).
+
+### Routing & Headers on Cloudflare Pages:
+- SPA fallback is handled automatically via `public/_redirects` (`/* /index.html 200`).
+- Security and caching headers are applied via `public/_headers` (nosniff, frame denial, strict-origin, and cache-control disabling for `index.html`, `sw.js`, and manifests).
 
 ---
 
-## 4. Testing
+## 4. Testing & Verification
 
-- **Unit Tests (Tax calculations & Bill utilities)**:
+- **Unit Tests (Tax calculations, bill utilities & layout)**:
   ```bash
   npm test
   ```
-- **Supabase Database & API Verification (13 tests in FY '99-00')**:
+- **Supabase Database & API Verification (16 tests in sandbox FY '99-00')**:
   ```bash
   npm run db-check
   ```
 - **Production Build Verification**:
   ```bash
   npm run build
+  ```
+- **Package Security Audit**:
+  ```bash
+  npm audit
   ```
