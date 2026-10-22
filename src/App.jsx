@@ -15,6 +15,11 @@ import Buyers from './pages/Buyers.jsx';
 import Items from './pages/Items.jsx';
 import ItemImport from './pages/ItemImport.jsx';
 
+// Dev-only route for fixture and print layout testing (excluded in production build)
+const DevPrintSample = import.meta.env.DEV
+  ? React.lazy(() => import('./pages/DevPrintSample.jsx'))
+  : null;
+
 export default function App() {
   return (
     <AuthProvider>
@@ -43,6 +48,18 @@ export default function App() {
             <Route path="items" element={<Items />} />
             <Route path="items/import" element={<ItemImport />} />
           </Route>
+
+          {/* Dev-only route for A4 invoice print/PDF test fixtures */}
+          {import.meta.env.DEV && DevPrintSample && (
+            <Route
+              path="/dev/print-sample"
+              element={
+                <React.Suspense fallback={<div className="p-8 text-center font-bold">Loading print fixtures...</div>}>
+                  <DevPrintSample />
+                </React.Suspense>
+              }
+            />
+          )}
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

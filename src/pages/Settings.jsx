@@ -34,6 +34,25 @@ export default function Settings() {
   const [numberingSaving, setNumberingSaving] = useState(false);
   const [numberingMsg, setNumberingMsg] = useState({ type: '', text: '' });
 
+  // Print & PDF copy label preference
+  const [labelCopies, setLabelCopies] = useState(() => {
+    try {
+      return localStorage.getItem('khansa_label_copies') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleLabelCopies = () => {
+    const nextVal = !labelCopies;
+    setLabelCopies(nextVal);
+    try {
+      localStorage.setItem('khansa_label_copies', String(nextVal));
+    } catch (e) {
+      console.error('Failed to save copy label preference:', e);
+    }
+  };
+
   // 1. Load Firm Profile
   const loadFirmProfile = useCallback(async () => {
     setFirmLoading(true);
@@ -590,6 +609,45 @@ export default function Settings() {
             </button>
           </form>
         )}
+      </div>
+
+      {/* CARD 3: PRINT & PDF OPTIONS */}
+      <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="border-b border-slate-200 pb-3">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            Print &amp; PDF Options
+          </span>
+          <h3 className="text-xl font-black text-slate-900 mt-0.5">
+            Invoice Copy Labels
+          </h3>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border-2 border-slate-200 bg-slate-50">
+          <div className="space-y-1">
+            <span className="text-base font-bold text-slate-900 block">
+              Label copies Original / Duplicate / Triplicate
+            </span>
+            <p className="text-xs font-medium text-slate-600 max-w-xl">
+              When enabled, printed copies and PDF pages are labeled in the top right corner (&quot;ORIGINAL FOR RECIPIENT&quot;, &quot;DUPLICATE FOR TRANSPORTER&quot;, &quot;TRIPLICATE FOR SUPPLIER&quot;). Stored locally in this browser.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            role="switch"
+            aria-checked={labelCopies}
+            onClick={handleToggleLabelCopies}
+            className={`relative inline-flex h-8 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+              labelCopies ? 'bg-blue-700' : 'bg-slate-300'
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                labelCopies ? 'translate-x-6' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
       </div>
     </div>
   );
