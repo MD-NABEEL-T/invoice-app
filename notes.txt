@@ -102,34 +102,31 @@ It is also a resume project for me, so I want to understand every line.
 - Clarify: does the "dropdown of 2-3 companies" mean his buyers, or does he also bill under more than one of his own firm names?
 
 ## 7. Build plan
-| Step | Work | Done when |
+| Phase | Work | Status |
 |---|---|---|
-| 1 | Setup: GitHub repo `invoice-app`, Vite + React + Tailwind, Supabase project, Cloudflare Pages | Blank app live on a URL |
-| 2 | Tax logic as pure functions + tests (Vitest): GST by rate, CGST/SGST, round-off, amount in words, FY detection | Reproduces ₹1,246.25 and ₹3,392.50 |
-| 3 | DB: `buyers`, `buyer_addresses`, `items`, `invoices`, `invoice_lines`, `counters`; RLS; next-number function | Verified via Postman against the Supabase REST API before any UI |
-| 4 | Screens: login, buyers, items, new invoice, list/search, copy-as-new | Create an invoice end to end |
-| 5 | A4 print stylesheet and PDF | Printout matches his Excel bill |
-| 6 | Reports (Excel export, statement) | Matches his April sheets |
-| 7 | Hardening: keep-alive cron, data export, PWA, test on his phone and printer | A real bill printed on his setup |
-| 8 | Handover: 1-hour walkthrough, run parallel with Excel for a month | He stops using Excel |
-Estimate: about 3-4 weekends of part-time work.
+| Phase 1 | Tax logic as pure functions + tests (Vitest): GST by rate, CGST/SGST, round-off, amount in words, FY detection | Done |
+| Phase 2 | DB: `buyers`, `buyer_addresses`, `items`, `invoices`, `invoice_lines`, `counters`; RLS; next-number function; sandbox tests | Done |
+| Phase 2b | Sandbox db-check enhancements | Done |
+| Phase 3 | Private login and persistent auth state | Done |
+| Phase 4 | Buyers & items management screens | Done |
+| Phase 4b | Item Excel import with deduplication and validation | Done |
+| Phase 5 | New invoice creation, bill register, filters, and copy-as-new payload | Done |
+| Phase 6 | Exact A4 print stylesheet, invoice pagination, and PDF generator | Done |
+| Phase 6b | PWA update banner, caching headers, Cloudflare Pages deployment config | Done |
+| Phase 6c | Fix PDF oklch error, phone preview scaling, labels, CANCELLED mark, replace xlsx | Done |
+| Phase 7 | Cancel bill + copy-as-new UI flow + edit & delete bills | Done |
+| Phase 7b | HSN code helper and verification workflow | Done |
+| Phase 8 | Month-end reports (HARDCOPY buyer statement, GST register, HSN summary Excel export) | Done |
+| Phase 9 | Complete PWA implementation with install prompt, offline mode, and data backup | Done |
 
 ## 8. Current status
-- Done: analysis, stack decision, requirements draft, plan.
-- Environment: Windows. Node **v22.14.0** installed. VS Code installed.
-- Antigravity IDE's agent does not work on my laptop. The language server gets killed (SIGTERM) and RAM sits at ~84% with Chrome and the IDE open. Decision: **use VS Code** for this project and free memory.
-- In progress: Step 1. I was told to run, in Command Prompt:
-```
-  cd %USERPROFILE%\Documents
-  npm create vite@latest invoice-app -- --template react
-```
-  (answer No to experimental/rolldown options and No to "install and start now").
-- Pending from me: create the empty GitHub repo `invoice-app`; send the uncle the info checklist; find who files his GST returns; get the list of active items.
-
-## 9. Next actions (for the AI continuing)
-1. Ask me what the Vite command printed. Fix any error.
-2. Then: `cd invoice-app`, `npm install`, `npm run dev`, confirm it opens in the browser.
-3. Add Tailwind (use the current Vite plugin setup from the official docs).
-4. `git init`, connect to my GitHub repo `invoice-app`, first commit and push.
-5. Start Step 2 (tax functions with tests) before touching Supabase.
-Give one action per message and wait for my result.
+- Environment: Windows, Node v22.14.0.
+- Database: Supabase PostgreSQL with Row Level Security.
+- Frontend: Vite + React + Tailwind CSS + PWA with service worker precaching.
+- All remaining phases completed:
+  1. Full PWA support: standalone manifest, service worker precaching, offline banner, and 1-tap install banner.
+  2. Phase 7: Cancel bill with CANCELLED watermark stamp and void handling + Copy as new bill UI flow + editable & deletable bills.
+  3. Phase 7b: HSN lookup guide modal, 1-click verify action in Items catalog, and quick HSN preset chips in bill creation.
+  4. Phase 8: Month-End Reports with FY and Month filters, KPI cards, Buyer statement (HARDCOPY), GST Sales Register, HSN Summary, and multi-sheet Excel (.xlsx) export.
+  5. Full Database Backup & Export (JSON & multi-sheet Excel) in More menu.
+  6. Email & Google Apps Script webhook integration for khansaenterprises19@gmail.com in Settings.

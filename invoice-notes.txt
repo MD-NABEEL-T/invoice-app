@@ -1,0 +1,28 @@
+001/26-27
+next invoice 
+002/26-27
+
+two numbers to add :
+8300533896
+9342614838
+
+new bill modifications:
+branch 1,2 not needed instead 
+use like company start name like lgd , unit 3 kh, unit 4 kh, osf vellore and any other companies we can be able to add as well  
+
+Buyer order no should be caps by default 
+
+the bill should be editable since the buyer asks change in rate and other stuff so make it editable itself 
+and also can delete this
+
+fonts should be more professional like understandable so use like times roman or anything else 
+watermark also needs to be added like "KHANSA" it should have light opacity to each bill
+
+
+print bill modifications:
+the ui breaks when we download the pdf alright and when i click print it should print as much as quantity mentioned but whereas when we download it should download one format only no need to mention that duplicate ,triplicate and all 
+terms of delivery not needed to print and remove that 
+
+after each bill that bill needs to be automated and sent to this email ,we can use gsheets appscript for this right:khansaenterprises19@gmail.com
+
+

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase.js';
 import { validateImportRow } from '../lib/itemValidation.js';
 import { formatRupees } from '../lib/billUtils.js';
@@ -43,7 +42,10 @@ export default function ItemImport() {
     setImportResult(null);
 
     try {
-      const buffer = await file.arrayBuffer();
+      const [XLSX, buffer] = await Promise.all([
+        import('xlsx'),
+        file.arrayBuffer(),
+      ]);
       const wb = XLSX.read(buffer, { type: 'array' });
 
       // Look for sheet named "Items" or fall back to first sheet

@@ -43,6 +43,7 @@ export default function App() {
             <Route path="new" element={<NewBill />} />
             <Route path="bills" element={<Bills />} />
             <Route path="bills/:id" element={<BillView />} />
+            <Route path="bills/:id/edit" element={<NewBill />} />
             <Route path="reports" element={<Reports />} />
             <Route path="more" element={<More />} />
             <Route path="settings" element={<Settings />} />

@@ -348,7 +348,7 @@ export default function Buyers() {
                       <svg className="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                       </svg>
-                      <span>Add Branch Address</span>
+                      <span>Add Delivery Unit / Address</span>
                     </button>
 
                     {branchesLoading ? (
@@ -505,20 +505,32 @@ export default function Buyers() {
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border-2 border-slate-900 max-w-lg w-full p-6 shadow-2xl space-y-4">
             <h3 className="text-xl font-black text-slate-900">
-              {branchModal.mode === 'add' ? 'Add Branch Address' : 'Edit Branch Address'}
+              {branchModal.mode === 'add' ? 'Add Delivery Unit / Address' : 'Edit Delivery Unit / Address'}
             </h3>
 
             <form onSubmit={handleSaveBranch} className="space-y-4">
               <div>
                 <label className="block text-base font-bold text-slate-900 mb-1">
-                  Branch Label *
+                  Unit / Company Start Name *
                 </label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {['LGD', 'Unit 3 KH', 'Unit 4 KH', 'OSF Vellore'].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setBranchModal({ ...branchModal, label: preset })}
+                      className="text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-50 text-blue-800 border border-blue-300 hover:bg-blue-100 transition active:scale-95"
+                    >
+                      + {preset}
+                    </button>
+                  ))}
+                </div>
                 <input
                   type="text"
                   required
                   value={branchModal.label}
                   onChange={(e) => setBranchModal({ ...branchModal, label: e.target.value })}
-                  placeholder="e.g. Branch 1 or Unit III Melvisharam"
+                  placeholder="e.g. LGD, Unit 3 KH, Unit 4 KH, OSF Vellore"
                   className="w-full min-h-[50px] px-4 py-3 rounded-xl border-2 border-slate-400 text-slate-900 text-base font-bold"
                 />
               </div>
@@ -550,7 +562,7 @@ export default function Buyers() {
                   disabled={savingBranch}
                   className="flex-1 min-h-[48px] rounded-xl bg-blue-700 text-white font-bold hover:bg-blue-800"
                 >
-                  {savingBranch ? 'Saving...' : 'Save Branch'}
+                  {savingBranch ? 'Saving...' : 'Save Unit / Address'}
                 </button>
               </div>
             </form>

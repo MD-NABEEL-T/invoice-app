@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase.js';
 import { formatRupees } from '../lib/billUtils.js';
 import { paiseToRupees, rupeesToPaise } from '../lib/tax.js';
 import { validateHSN } from '../lib/itemValidation.js';
+import { COMMON_HSN_CODES } from '../lib/hsnCodes.js';
 
 export default function Items() {
   const [items, setItems] = useState([]);
@@ -11,6 +12,9 @@ export default function Items() {
   const [errorMsg, setErrorMsg] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState('all'); // 'all' | 'needs_checking' | 'verified'
+
+  // HSN Guide modal
+  const [hsnGuideOpen, setHsnGuideOpen] = useState(false);
 
   // Add / Edit Modal
   const [itemModal, setItemModal] = useState({
@@ -128,6 +132,27 @@ export default function Items() {
     }
   };
 
+  // Quick 1-click Verify
+  const handleQuickVerify = async (item) => {
+    if (!item.hsn || item.gst_percent === null || item.gst_percent === undefined) {
+      alert(`Item "${item.description}" must have both HSN code and GST % entered before marking verified. Please click Edit.`);
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('items')
+        .update({ verified: true, updated_at: new Date().toISOString() })
+        .eq('id', item.id);
+
+      if (error) throw error;
+      setItems((prev) =>
+        prev.map((it) => (it.id === item.id ? { ...it, verified: true } : it))
+      );
+    } catch (err) {
+      alert(err.message || 'Error verifying item.');
+    }
+  };
+
   // Toggle Item Active (Deactivate, never delete)
   const toggleItemActive = async (item) => {
     try {
@@ -157,12 +182,22 @@ export default function Items() {
           </p>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* HSN Guide Modal Button */}
+          <button
+            type="button"
+            onClick={() => setHsnGuideOpen(true)}
+            className="min-h-[44px] px-3 py-2 rounded-xl bg-purple-50 border-2 border-purple-300 text-purple-900 font-bold text-xs hover:bg-purple-100 flex items-center space-x-1"
+          >
+            <span>📖</span>
+            <span>HSN Helper</span>
+          </button>
+
           <Link
             to="/items/import"
-            className="min-h-[48px] px-3.5 py-2.5 rounded-xl bg-white border-2 border-slate-300 text-slate-900 font-bold text-sm hover:bg-slate-50 shadow-sm flex items-center space-x-1"
+            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-white border-2 border-slate-300 text-slate-900 font-bold text-xs hover:bg-slate-50 shadow-sm flex items-center space-x-1"
           >
-            <svg className="w-5 h-5 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
             <span>Import Excel</span>
@@ -183,9 +218,9 @@ export default function Items() {
               });
               setHsnWarning(null);
             }}
-            className="min-h-[48px] px-4 py-2.5 rounded-xl bg-blue-700 text-white font-bold text-sm hover:bg-blue-800 shadow-sm flex items-center space-x-1"
+            className="min-h-[44px] px-4 py-2 rounded-xl bg-blue-700 text-white font-bold text-xs hover:bg-blue-800 shadow-sm flex items-center space-x-1 cursor-pointer"
           >
-            <svg className="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
             <span>Add Item</span>
@@ -208,7 +243,7 @@ export default function Items() {
       <div className="flex space-x-2 overflow-x-auto pb-1">
         <button
           onClick={() => setFilterMode('all')}
-          className={`min-h-[44px] px-3.5 py-1.5 rounded-xl text-xs font-black transition border-2 ${
+          className={`min-h-[44px] px-3.5 py-1.5 rounded-xl text-xs font-black transition border-2 cursor-pointer ${
             filterMode === 'all'
               ? 'bg-slate-900 text-white border-slate-900'
               : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
@@ -218,7 +253,7 @@ export default function Items() {
         </button>
         <button
           onClick={() => setFilterMode('needs_checking')}
-          className={`min-h-[44px] px-3.5 py-1.5 rounded-xl text-xs font-black transition border-2 ${
+          className={`min-h-[44px] px-3.5 py-1.5 rounded-xl text-xs font-black transition border-2 cursor-pointer ${
             filterMode === 'needs_checking'
               ? 'bg-amber-600 text-white border-amber-600'
               : 'bg-white text-amber-800 border-amber-300 hover:bg-amber-50'
@@ -230,7 +265,7 @@ export default function Items() {
         </button>
         <button
           onClick={() => setFilterMode('verified')}
-          className={`min-h-[44px] px-3.5 py-1.5 rounded-xl text-xs font-black transition border-2 ${
+          className={`min-h-[44px] px-3.5 py-1.5 rounded-xl text-xs font-black transition border-2 cursor-pointer ${
             filterMode === 'verified'
               ? 'bg-emerald-700 text-white border-emerald-700'
               : 'bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-50'
@@ -332,6 +367,18 @@ export default function Items() {
 
                 {/* Action Buttons */}
                 <div className="pt-1.5 flex items-center justify-end space-x-2">
+                  {/* Quick 1-click Verify button if not verified */}
+                  {!item.verified && (
+                    <button
+                      type="button"
+                      onClick={() => handleQuickVerify(item)}
+                      className="min-h-[40px] px-3.5 py-1.5 rounded-xl text-xs font-black bg-emerald-50 text-emerald-900 border border-emerald-300 hover:bg-emerald-100 cursor-pointer"
+                      title="Quick mark as verified"
+                    >
+                      ✓ Verify
+                    </button>
+                  )}
+
                   <button
                     onClick={() => {
                       setItemModal({
@@ -352,13 +399,13 @@ export default function Items() {
                         setHsnWarning('HSN code is empty (needs checking)');
                       }
                     }}
-                    className="min-h-[40px] px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-800 border border-slate-300 hover:bg-slate-50"
+                    className="min-h-[40px] px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-800 border border-slate-300 hover:bg-slate-50 cursor-pointer"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => toggleItemActive(item)}
-                    className={`min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-bold border ${
+                    className={`min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer ${
                       item.active
                         ? 'border-amber-300 bg-amber-50 text-amber-900'
                         : 'border-emerald-300 bg-emerald-50 text-emerald-900'
@@ -373,7 +420,70 @@ export default function Items() {
         </div>
       )}
 
-      {/* MODAL: ADD / EDIT ITEM */}
+      {/* MODAL 1: HSN GUIDE & LOOKUP HELPER (Phase 7b) */}
+      {hsnGuideOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border-2 border-slate-900 max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between border-b border-slate-200 pb-3">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-purple-700">
+                  GST Reference
+                </span>
+                <h3 className="text-2xl font-black text-slate-900">
+                  Common HSN Codes Helper
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHsnGuideOpen(false)}
+                className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+
+            <p className="text-xs font-semibold text-slate-600">
+              Reference cheat-sheet for Uncle's products (effective GST slabs: 5% &amp; 18%). Confirm with return filer:
+            </p>
+
+            <div className="space-y-2">
+              {COMMON_HSN_CODES.map((h) => (
+                <div
+                  key={h.hsn}
+                  className="p-3 rounded-xl border border-slate-200 bg-slate-50/70 space-y-1 hover:bg-slate-100 transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-black text-base text-slate-900">
+                      HSN {h.hsn}
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-xs font-black bg-blue-100 text-blue-900 border border-blue-300">
+                      {h.defaultGst}% GST
+                    </span>
+                  </div>
+                  <p className="text-sm font-bold text-slate-800">
+                    {h.category}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {h.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setHsnGuideOpen(false)}
+                className="w-full min-h-[48px] rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 cursor-pointer"
+              >
+                Close Guide
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: ADD / EDIT ITEM */}
       {itemModal.isOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border-2 border-slate-900 max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
@@ -415,7 +525,7 @@ export default function Items() {
                       type="button"
                       key={u}
                       onClick={() => setItemModal({ ...itemModal, unit: u })}
-                      className="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300"
+                      className="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 cursor-pointer"
                     >
                       {u}
                     </button>
@@ -423,11 +533,33 @@ export default function Items() {
                 </div>
               </div>
 
-              {/* HSN Code with Warning */}
+              {/* HSN Code with Preset Chips (Phase 7b) */}
               <div>
-                <label className="block text-base font-bold text-slate-900 mb-1">
-                  HSN Code (Free text)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-base font-bold text-slate-900">
+                    HSN Code &amp; Tax Rate
+                  </label>
+                  <span className="text-xs font-bold text-slate-500">Quick presets:</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {COMMON_HSN_CODES.slice(0, 6).map((preset) => (
+                    <button
+                      key={preset.hsn}
+                      type="button"
+                      onClick={() => {
+                        setItemModal({
+                          ...itemModal,
+                          hsn: preset.hsn,
+                          gst_percent: String(preset.defaultGst),
+                        });
+                        setHsnWarning(null);
+                      }}
+                      className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 transition active:scale-95 cursor-pointer"
+                    >
+                      {preset.hsn} ({preset.defaultGst}%) &bull; {preset.category.split('/')[0].trim()}
+                    </button>
+                  ))}
+                </div>
                 <input
                   type="text"
                   value={itemModal.hsn}
@@ -501,14 +633,14 @@ export default function Items() {
                 <button
                   type="button"
                   onClick={() => setItemModal({ ...itemModal, isOpen: false })}
-                  className="flex-1 min-h-[48px] rounded-xl border-2 border-slate-400 font-bold text-slate-700"
+                  className="flex-1 min-h-[48px] rounded-xl border-2 border-slate-400 font-bold text-slate-700 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={savingItem}
-                  className="flex-1 min-h-[48px] rounded-xl bg-blue-700 text-white font-bold hover:bg-blue-800"
+                  className="flex-1 min-h-[48px] rounded-xl bg-blue-700 text-white font-bold hover:bg-blue-800 cursor-pointer"
                 >
                   {savingItem ? 'Saving...' : 'Save Item'}
                 </button>

@@ -73,4 +73,18 @@ body {
     page-break-after: auto !important;
     break-after: auto !important;
   }
+
+  /* Unscale preview container for print */
+  .invoice-scale-outer,
+  .invoice-scale-wrapper {
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+  }
+
+  .invoice-scale-inner {
+    width: 100% !important;
+    transform: none !important;
+  }
 }

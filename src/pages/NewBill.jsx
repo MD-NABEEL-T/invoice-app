@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { financialYear, paiseToRupees, calcInvoice } from '../lib/tax.js';
 import {
@@ -12,6 +12,7 @@ import {
 } from '../lib/billPayload.js';
 import { formatRupees, formatDisplayDate } from '../lib/billUtils.js';
 import { validateHSN } from '../lib/itemValidation.js';
+import { COMMON_HSN_CODES } from '../lib/hsnCodes.js';
 
 const DRAFT_STORAGE_KEY = 'draft_new_bill';
 
@@ -25,6 +26,14 @@ function getTodayLocalDate() {
 
 export default function NewBill() {
   const navigate = useNavigate();
+  const { id: editBillId } = useParams();
+  const isEditMode = Boolean(editBillId);
+  const [searchParams] = useSearchParams();
+  const copyFromId = searchParams.get('copyFrom');
+  const [copiedFromNotice, setCopiedFromNotice] = useState('');
+
+  const [existingInvoice, setExistingInvoice] = useState(null);
+  const [loadingExisting, setLoadingExisting] = useState(isEditMode || Boolean(copyFromId));
 
   // ---------------------------------------------------------------------------
   // 1. Gate & Financial Year State
@@ -32,8 +41,8 @@ export default function NewBill() {
   const [billDate, setBillDate] = useState(getTodayLocalDate);
   const derivedFy = useMemo(() => financialYear(billDate), [billDate]);
 
-  const [gateLoading, setGateLoading] = useState(true);
-  const [gateSet, setGateSet] = useState(null); // true | false
+  const [gateLoading, setGateLoading] = useState(!isEditMode);
+  const [gateSet, setGateSet] = useState(isEditMode ? true : null); // true | false
   const [gateError, setGateError] = useState('');
 
   // ---------------------------------------------------------------------------
@@ -238,6 +247,139 @@ export default function NewBill() {
       isMounted = false;
     };
   }, []);
+
+  // ---------------------------------------------------------------------------
+  // Load Existing Invoice for Edit Mode
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!editBillId) return;
+    let isSubscribed = true;
+
+    async function fetchBillForEdit() {
+      setLoadingExisting(true);
+      try {
+        const { data: inv, error } = await supabase
+          .from('invoices')
+          .select(`
+            *,
+            lines:invoice_lines(*)
+          `)
+          .eq('id', editBillId)
+          .single();
+
+        if (error) throw error;
+        if (!inv || !isSubscribed) return;
+
+        setExistingInvoice(inv);
+        if (inv.invoice_date) setBillDate(inv.invoice_date);
+        if (inv.buyer_id) setSelectedBuyerId(inv.buyer_id);
+        if (inv.buyer_address) setChosenAddress(inv.buyer_address);
+        if (inv.buyer_order_no) setBuyerOrderNo(inv.buyer_order_no.toUpperCase());
+        if (inv.buyer_order_date) setBuyerOrderDate(inv.buyer_order_date);
+        if (inv.delivery_no) setDeliveryNo(inv.delivery_no);
+        if (inv.delivery_date) setDeliveryDate(inv.delivery_date);
+        if (inv.despatched_through) setDespatchedThrough(inv.despatched_through);
+        if (inv.destination) setDestination(inv.destination);
+        if (inv.terms_of_delivery) setTermsOfDelivery(inv.terms_of_delivery);
+
+        if (Array.isArray(inv.lines) && inv.lines.length > 0) {
+          const sorted = [...inv.lines].sort((a, b) => (a.line_no || 0) - (b.line_no || 0));
+          const mapped = sorted.map((l) => ({
+            id: l.id || Math.random().toString(),
+            item_id: null,
+            description: l.description,
+            hsn: l.hsn || '',
+            gst_percent: String(l.gst_percent ?? 18),
+            unit: l.unit || 'PCS',
+            quantity: formatMilliToQuantity(l.qty_milli),
+            rate: paiseToRupees(l.rate_paise),
+            rate_paise: Number(l.rate_paise || 0),
+            qty_milli: Number(l.qty_milli || 0),
+          }));
+          setLines(mapped);
+        }
+      } catch (err) {
+        console.error('Error loading bill for edit:', err);
+        setServerError('Failed to load bill for editing.');
+      } finally {
+        if (isSubscribed) {
+          setLoadingExisting(false);
+          setGateLoading(false);
+          setGateSet(true);
+        }
+      }
+    }
+
+    fetchBillForEdit();
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [editBillId]);
+
+  // ---------------------------------------------------------------------------
+  // Load Existing Invoice for "Copy as New Bill" (Phase 7)
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (isEditMode || !copyFromId) return;
+    let isSubscribed = true;
+
+    async function fetchBillForCopy() {
+      setLoadingExisting(true);
+      try {
+        const { data: inv, error } = await supabase
+          .from('invoices')
+          .select(`
+            *,
+            lines:invoice_lines(*)
+          `)
+          .eq('id', copyFromId)
+          .single();
+
+        if (error) throw error;
+        if (!inv || !isSubscribed) return;
+
+        setCopiedFromNotice(`Copied details from bill ${inv.invoice_no}. A new invoice number will be assigned at finalization.`);
+        if (inv.buyer_id) setSelectedBuyerId(inv.buyer_id);
+        if (inv.buyer_address) setChosenAddress(inv.buyer_address);
+        if (inv.buyer_order_no) setBuyerOrderNo(inv.buyer_order_no.toUpperCase());
+        if (inv.buyer_order_date) setBuyerOrderDate(inv.buyer_order_date);
+        if (inv.delivery_no) setDeliveryNo(inv.delivery_no);
+        if (inv.despatched_through) setDespatchedThrough(inv.despatched_through);
+        if (inv.destination) setDestination(inv.destination);
+        if (inv.terms_of_delivery) setTermsOfDelivery(inv.terms_of_delivery);
+
+        if (Array.isArray(inv.lines) && inv.lines.length > 0) {
+          const sorted = [...inv.lines].sort((a, b) => (a.line_no || 0) - (b.line_no || 0));
+          const mapped = sorted.map((l) => ({
+            id: Math.random().toString(),
+            item_id: null,
+            description: l.description,
+            hsn: l.hsn || '',
+            gst_percent: String(l.gst_percent ?? 18),
+            unit: l.unit || 'PCS',
+            quantity: formatMilliToQuantity(l.qty_milli),
+            rate: paiseToRupees(l.rate_paise),
+            rate_paise: Number(l.rate_paise || 0),
+            qty_milli: Number(l.qty_milli || 0),
+          }));
+          setLines(mapped);
+        }
+      } catch (err) {
+        console.error('Error copying bill:', err);
+      } finally {
+        if (isSubscribed) {
+          setLoadingExisting(false);
+        }
+      }
+    }
+
+    fetchBillForCopy();
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [isEditMode, copyFromId]);
 
   // ===========================================================================
   // Effect: When Buyer changes, load non-blank active branch addresses
@@ -589,6 +731,85 @@ export default function NewBill() {
 
       const payload = buildInvoicePayload({ header, lines });
 
+      if (isEditMode) {
+        // Edit mode: update existing invoice
+        const { error: rpcErr } = await supabase.rpc('update_invoice', {
+          p_invoice_id: editBillId,
+          payload,
+        });
+
+        if (rpcErr) {
+          console.warn('RPC update_invoice error, using direct table update fallback:', rpcErr);
+          const { error: invErr } = await supabase.from('invoices').update({
+            invoice_date: header.invoice_date,
+            buyer_id: header.buyer_id,
+            buyer_name: header.buyer_name,
+            buyer_gstin: header.buyer_gstin,
+            buyer_state_code: header.buyer_state_code,
+            buyer_address: header.buyer_address,
+            buyer_order_no: header.buyer_order_no,
+            buyer_order_date: header.buyer_order_date,
+            delivery_no: header.delivery_no,
+            delivery_date: header.delivery_date,
+            despatched_through: header.despatched_through,
+            destination: header.destination,
+            taxable_paise: payload.taxable_paise,
+            cgst_paise: payload.cgst_paise,
+            sgst_paise: payload.sgst_paise,
+            payable_paise: payload.payable_paise,
+          }).eq('id', editBillId);
+          if (invErr) throw invErr;
+
+          await supabase.from('invoice_lines').delete().eq('invoice_id', editBillId);
+          const lineInserts = lines.map((l, idx) => {
+            const qtyMilli = l.qty_milli || parseQuantityToMilli(l.quantity);
+            const ratePaise = l.rate_paise !== undefined ? l.rate_paise : parseRupeesToPaise(l.rate);
+            return {
+              invoice_id: editBillId,
+              line_no: idx + 1,
+              description: l.description,
+              hsn: l.hsn,
+              unit: l.unit || 'PCS',
+              qty_milli: qtyMilli,
+              rate_paise: ratePaise,
+              gst_percent: Number(l.gst_percent),
+              amount_paise: Math.round((qtyMilli * ratePaise) / 1000),
+            };
+          });
+          const { error: linesErr } = await supabase.from('invoice_lines').insert(lineInserts);
+          if (linesErr) throw linesErr;
+        }
+
+        // Webhook dispatch
+        const webhookUrl = localStorage.getItem('khansa_gsheet_webhook_url');
+        if (webhookUrl) {
+          try {
+            fetch(webhookUrl, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                invoice_no: existingInvoice?.invoice_no,
+                date: header.invoice_date,
+                buyer_name: header.buyer_name,
+                buyer_order_no: header.buyer_order_no,
+                taxable_paise: payload.taxable_paise,
+                cgst_paise: payload.cgst_paise,
+                sgst_paise: payload.sgst_paise,
+                payable_paise: payload.payable_paise,
+                email_to: 'khansaenterprises19@gmail.com',
+              }),
+            }).catch(e => console.warn('Webhook dispatch error:', e));
+          } catch (e) {
+            console.warn('Webhook trigger error:', e);
+          }
+        }
+
+        setSaveModalOpen(false);
+        navigate(`/bills/${editBillId}`);
+        return;
+      }
+
       const { data, error } = await supabase.rpc('create_invoice', { payload });
 
       if (error) {
@@ -597,6 +818,31 @@ export default function NewBill() {
 
       if (!data || !data.id) {
         throw new Error('No invoice record returned by server');
+      }
+
+      // Trigger Webhook on new bill
+      const webhookUrl = localStorage.getItem('khansa_gsheet_webhook_url');
+      if (webhookUrl) {
+        try {
+          fetch(webhookUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              invoice_no: data.invoice_no,
+              date: header.invoice_date,
+              buyer_name: header.buyer_name,
+              buyer_order_no: header.buyer_order_no,
+              taxable_paise: payload.taxable_paise,
+              cgst_paise: payload.cgst_paise,
+              sgst_paise: payload.sgst_paise,
+              payable_paise: payload.payable_paise,
+              email_to: 'khansaenterprises19@gmail.com',
+            }),
+          }).catch(e => console.warn('Webhook dispatch error:', e));
+        } catch (e) {
+          console.warn('Webhook trigger error:', e);
+        }
       }
 
       // Successful save: clear draft and redirect to bill view
@@ -634,18 +880,19 @@ export default function NewBill() {
   };
 
   // ===========================================================================
-  // GATE VIEW: If numbering is not set, BLOCK and SHOW CLEAR MESSAGE
+  // GATE VIEW: If numbering is not set, BLOCK and SHOW CLEAR MESSAGE (New bills only)
   // ===========================================================================
-  if (gateLoading) {
+  if (loadingExisting || gateLoading) {
     return (
       <div className="bg-white rounded-2xl border-2 border-slate-300 p-8 text-center space-y-3">
-        <p className="text-lg font-bold text-slate-700">Verifying bill numbering series...</p>
-        <p className="text-sm text-slate-500">Checking series status for FY {derivedFy}...</p>
+        <p className="text-lg font-bold text-slate-700">
+          {isEditMode ? 'Loading bill details for editing...' : 'Verifying bill numbering series...'}
+        </p>
       </div>
     );
   }
 
-  if (!gateSet) {
+  if (!gateSet && !isEditMode) {
     return (
       <div className="bg-white rounded-3xl border-2 border-amber-300 p-6 sm:p-8 text-center space-y-5 shadow-sm max-w-lg mx-auto">
         <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center">
@@ -693,10 +940,14 @@ export default function NewBill() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-            New Bill
+            {isEditMode ? `Edit Bill: ${existingInvoice?.invoice_no || ''}` : 'New Bill'}
           </h2>
           <p className="text-sm font-semibold text-slate-500">
-            Financial Year: <span className="font-mono font-bold text-slate-900">{derivedFy}</span>
+            {isEditMode ? (
+              <span>Editing finalized invoice &bull; Financial Year: <span className="font-mono font-bold text-slate-900">{derivedFy}</span></span>
+            ) : (
+              <span>Financial Year: <span className="font-mono font-bold text-slate-900">{derivedFy}</span></span>
+            )}
           </p>
         </div>
 
@@ -710,6 +961,23 @@ export default function NewBill() {
           </button>
         )}
       </div>
+
+      {/* Copied from existing bill notice (Phase 7) */}
+      {copiedFromNotice && (
+        <div className="p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-400 text-emerald-950 font-bold text-sm flex items-center justify-between gap-2 shadow-xs">
+          <div className="flex items-center space-x-2">
+            <span className="text-xl">📋</span>
+            <span>{copiedFromNotice}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCopiedFromNotice('')}
+            className="text-emerald-700 hover:text-emerald-900 font-black text-lg cursor-pointer"
+          >
+            &times;
+          </button>
+        </div>
+      )}
 
       {/* Draft Restored Banner */}
       {draftRestored && (
@@ -802,15 +1070,25 @@ export default function NewBill() {
           </select>
         </div>
 
-        {/* Branch Dropdown */}
+        {/* Branch / Unit Dropdown */}
         {selectedBuyerId && (
           <div>
-            <label className="block text-base font-bold text-slate-900 mb-1">
-              Delivery Branch Unit *
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-base font-bold text-slate-900">
+                Delivery Unit / Company *
+              </label>
+              <Link
+                to="/buyers"
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-bold text-blue-700 hover:text-blue-900 hover:underline flex items-center space-x-1"
+              >
+                <span>+ Add / Manage Units</span>
+              </Link>
+            </div>
             {branches.length === 0 ? (
               <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 text-xs font-bold text-amber-900">
-                No active delivery branch address found for this buyer. Please add an address in Buyers &amp; Branches.
+                No active delivery unit address found for this buyer. Please add an address in Buyers &amp; Units.
               </div>
             ) : (
               <select
@@ -850,9 +1128,9 @@ export default function NewBill() {
               type="text"
               required
               value={buyerOrderNo}
-              onChange={(e) => setBuyerOrderNo(e.target.value)}
+              onChange={(e) => setBuyerOrderNo(e.target.value.toUpperCase())}
               placeholder="e.g. PO-1046"
-              className="w-full min-h-[50px] px-4 py-3 rounded-2xl border-2 border-slate-400 text-slate-900 text-base font-bold"
+              className="w-full min-h-[50px] px-4 py-3 rounded-2xl border-2 border-slate-400 text-slate-900 text-base font-bold uppercase"
             />
           </div>
 
@@ -913,33 +1191,18 @@ export default function NewBill() {
           />
         </div>
 
-        {/* Destination & Terms of Delivery (Optional) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-base font-bold text-slate-900 mb-1">
-              Destination (Optional)
-            </label>
-            <input
-              type="text"
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              placeholder="e.g. Melvisharam / Chennai"
-              className="w-full min-h-[50px] px-4 py-3 rounded-2xl border-2 border-slate-400 text-slate-900 text-base font-bold"
-            />
-          </div>
-
-          <div>
-            <label className="block text-base font-bold text-slate-900 mb-1">
-              Terms of Delivery (Optional)
-            </label>
-            <input
-              type="text"
-              value={termsOfDelivery}
-              onChange={(e) => setTermsOfDelivery(e.target.value)}
-              placeholder="e.g. By Road / Immediate"
-              className="w-full min-h-[50px] px-4 py-3 rounded-2xl border-2 border-slate-400 text-slate-900 text-base font-bold"
-            />
-          </div>
+        {/* Destination (Optional) */}
+        <div>
+          <label className="block text-base font-bold text-slate-900 mb-1">
+            Destination (Optional)
+          </label>
+          <input
+            type="text"
+            value={destination}
+            onChange={(e) => setDestination(e.target.value)}
+            placeholder="e.g. Melvisharam / Chennai"
+            className="w-full min-h-[50px] px-4 py-3 rounded-2xl border-2 border-slate-400 text-slate-900 text-base font-bold"
+          />
         </div>
       </div>
 
@@ -1280,10 +1543,12 @@ export default function NewBill() {
 
             <div className="space-y-2">
               <h3 className="text-xl font-black text-slate-900">
-                Confirm Bill Finalization
+                {isEditMode ? 'Confirm Bill Update' : 'Confirm Bill Finalization'}
               </h3>
-              <p className="text-sm font-bold text-red-700 bg-red-50 p-3 rounded-xl border border-red-200">
-                This bill cannot be edited later, only cancelled.
+              <p className="text-sm font-bold text-blue-900 bg-blue-50 p-3 rounded-xl border border-blue-200">
+                {isEditMode
+                  ? `Updating bill ${existingInvoice?.invoice_no || ''}. You can make changes anytime.`
+                  : 'Invoice will be saved and assigned an automatic sequence number.'}
               </p>
               <p className="text-sm text-slate-600">
                 Are you sure all buyer information, branch address, and line items are correct?
@@ -1324,7 +1589,7 @@ export default function NewBill() {
                 disabled={isSaving}
                 className="flex-1 min-h-[48px] rounded-2xl bg-blue-700 text-white font-black hover:bg-blue-800 disabled:opacity-50"
               >
-                {isSaving ? 'Saving...' : 'Yes, Finalize'}
+                {isSaving ? 'Saving...' : isEditMode ? 'Update Bill' : 'Yes, Finalize'}
               </button>
             </div>
           </div>
@@ -1418,9 +1683,31 @@ export default function NewBill() {
               </div>
 
               <div>
-                <label className="block text-base font-bold text-slate-900 mb-1">
-                  HSN Code
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-base font-bold text-slate-900">
+                    HSN Code &amp; Tax Rate
+                  </label>
+                  <span className="text-xs font-bold text-slate-500">Quick presets:</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {COMMON_HSN_CODES.slice(0, 6).map((preset) => (
+                    <button
+                      key={preset.hsn}
+                      type="button"
+                      onClick={() => {
+                        setNewItemForm({
+                          ...newItemForm,
+                          hsn: preset.hsn,
+                          gst_percent: String(preset.defaultGst),
+                        });
+                        setNewItemHsnWarning(null);
+                      }}
+                      className="text-[11px] font-bold px-2 py-1 rounded-lg bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 transition active:scale-95 cursor-pointer"
+                    >
+                      {preset.hsn} ({preset.defaultGst}%) &bull; {preset.category.split('/')[0].trim()}
+                    </button>
+                  ))}
+                </div>
                 <input
                   type="text"
                   value={newItemForm.hsn}

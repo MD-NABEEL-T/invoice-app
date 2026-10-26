@@ -6,7 +6,7 @@ import { generateInvoicePdfBlob, downloadInvoicePdf, shareInvoicePdf } from '../
 const SAMPLE_FIRM = {
   name: 'KHANSA ENTERPRISES',
   address: '#158,Pudhupet 3rd Street,\nMELVISHARAM-632509\nRanipet District\nTamil Nadu.',
-  phone: '9445671796',
+  phone: '8300533896, 9342614838',
   email: 'mohammedafzalarni@yahoo.com',
   gstin: '33AGXPF4947Q1ZH',
   declaration: 'We declare that this invoice shows the actual price of the goods described & that all particulars are true and correct',
@@ -148,6 +148,14 @@ const SAMPLE_30_LINES = {
   })),
 };
 
+// Sample Cancelled Bill (to test CANCELLED mark and watermark)
+const SAMPLE_CANCELLED = {
+  ...SAMPLE_A,
+  id: 'fixture-sample-cancelled',
+  invoice_no: 'CANCELLED-046/25-26',
+  status: 'cancelled',
+};
+
 export default function DevPrintSample() {
   const [selectedSample, setSelectedSample] = useState('SAMPLE_A');
   const [copyCount, setCopyCount] = useState(3);
@@ -161,6 +169,8 @@ export default function DevPrintSample() {
       ? SAMPLE_A
       : selectedSample === 'SAMPLE_B'
       ? SAMPLE_B
+      : selectedSample === 'SAMPLE_CANCELLED'
+      ? SAMPLE_CANCELLED
       : SAMPLE_30_LINES;
 
   const handlePrint = () => {
@@ -260,6 +270,7 @@ export default function DevPrintSample() {
             >
               <option value="SAMPLE_A">Sample A: 046/25-26 (2 rates: 5% + 18%)</option>
               <option value="SAMPLE_B">Sample B: 047/25-26 (3 lines @ 18%)</option>
+              <option value="SAMPLE_CANCELLED">Sample Cancelled: 046/25-26 (Cancelled Stamp &amp; Banner)</option>
               <option value="SAMPLE_30">Sample 30-Line: Test Multi-Page Pagination</option>
             </select>
           </div>

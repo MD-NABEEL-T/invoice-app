@@ -53,6 +53,27 @@ export default function Settings() {
     }
   };
 
+  // Google Apps Script / Email Webhook state
+  const [webhookUrl, setWebhookUrl] = useState(() => {
+    try {
+      return localStorage.getItem('khansa_gsheet_webhook_url') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [webhookStatus, setWebhookStatus] = useState('');
+
+  const handleSaveWebhook = (e) => {
+    e.preventDefault();
+    try {
+      localStorage.setItem('khansa_gsheet_webhook_url', webhookUrl.trim());
+      setWebhookStatus('Webhook URL saved successfully!');
+      setTimeout(() => setWebhookStatus(''), 4000);
+    } catch (err) {
+      setWebhookStatus(`Failed to save: ${err.message}`);
+    }
+  };
+
   // 1. Load Firm Profile
   const loadFirmProfile = useCallback(async () => {
     setFirmLoading(true);
@@ -648,6 +669,68 @@ export default function Settings() {
             />
           </button>
         </div>
+      </div>
+
+      {/* CARD 4: EMAIL & GOOGLE SHEETS AUTOMATION */}
+      <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="border-b border-slate-200 pb-3">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            Email &amp; Sheets Automation
+          </span>
+          <h3 className="text-xl font-black text-slate-900 mt-0.5">
+            Google Apps Script Webhook
+          </h3>
+        </div>
+
+        <p className="text-xs font-medium text-slate-600 leading-relaxed">
+          Automatically dispatch each finalized bill to Google Sheets and send email notification to{' '}
+          <strong className="text-slate-900 font-bold">khansaenterprises19@gmail.com</strong>.
+        </p>
+
+        {webhookStatus && (
+          <div className="p-3 bg-emerald-50 border border-emerald-400 rounded-xl text-xs font-bold text-emerald-950">
+            {webhookStatus}
+          </div>
+        )}
+
+        <form onSubmit={handleSaveWebhook} className="space-y-3">
+          <div>
+            <label htmlFor="webhookUrlInput" className="block text-sm font-bold text-slate-900 mb-1">
+              Apps Script Webhook URL (POST)
+            </label>
+            <input
+              id="webhookUrlInput"
+              type="url"
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+              placeholder="https://script.google.com/macros/s/.../exec"
+              className="w-full min-h-[48px] px-4 py-2.5 rounded-xl border-2 border-slate-400 bg-white text-slate-900 text-sm font-mono focus:border-slate-900"
+            />
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <button
+              type="submit"
+              className="min-h-[44px] px-5 py-2 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 cursor-pointer"
+            >
+              Save Webhook URL
+            </button>
+            {webhookUrl && (
+              <button
+                type="button"
+                onClick={() => {
+                  setWebhookUrl('');
+                  localStorage.removeItem('khansa_gsheet_webhook_url');
+                  setWebhookStatus('Webhook URL removed.');
+                  setTimeout(() => setWebhookStatus(''), 3000);
+                }}
+                className="min-h-[44px] px-3.5 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </form>
       </div>
 
       {/* App Version Info Footer */}

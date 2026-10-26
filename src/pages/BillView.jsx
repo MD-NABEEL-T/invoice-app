@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { formatRupees, formatDisplayDate } from '../lib/billUtils.js';
 import { calcInvoice } from '../lib/tax.js';
@@ -10,10 +10,21 @@ import { generateInvoicePdfBlob, downloadInvoicePdf, shareInvoicePdf } from '../
 
 export default function BillView() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [invoice, setInvoice] = useState(null);
   const [firmProfile, setFirmProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Delete modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  // Cancel modal state (Phase 7)
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState('');
 
   // View mode: 'cards' or 'preview'
   const [viewMode, setViewMode] = useState('cards');
@@ -138,8 +149,8 @@ export default function BillView() {
     setGeneratingPdf(true);
     setPdfMessage('Rendering invoice pages to PDF...');
     try {
-      const container = document.getElementById('print-container');
-      if (!container) throw new Error('Print container not available in DOM');
+      const container = document.getElementById('pdf-download-container') || document.getElementById('print-container');
+      if (!container) throw new Error('PDF container not available in DOM');
 
       const pageElements = container.querySelectorAll('.invoice-page');
       if (pageElements.length === 0) throw new Error('No invoice pages found to render');
@@ -156,7 +167,7 @@ export default function BillView() {
       if (actionType === 'share') {
         const shareResult = await shareInvoicePdf(blob, filename, {
           title: `Invoice ${invoice.invoice_no}`,
-          text: `Tax Invoice ${invoice.invoice_no} (${copyCount} ${copyCount === 1 ? 'copy' : 'copies'})`,
+          text: `Tax Invoice ${invoice.invoice_no}`,
         });
 
         if (shareResult.fallbackNeeded) {
@@ -172,13 +183,64 @@ export default function BillView() {
       } else {
         // Download action
         downloadInvoicePdf(blob, filename);
-        setPdfMessage(`Downloaded ${filename} (${sizeKb} KB for ${pageElements.length} pages).`);
+        setPdfMessage(`Downloaded ${filename} (${sizeKb} KB).`);
       }
     } catch (err) {
       console.error('PDF generation error:', err);
       setPdfMessage(`Failed to generate PDF: ${err.message}`);
     } finally {
       setGeneratingPdf(false);
+    }
+  };
+
+  // Action: Delete Invoice
+  const handleConfirmDelete = async () => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    setDeleteError('');
+    try {
+      const { error: rpcErr } = await supabase.rpc('delete_invoice', { p_invoice_id: id });
+      if (rpcErr) {
+        // Fallback direct delete if RPC not yet deployed
+        const { error: linesErr } = await supabase.from('invoice_lines').delete().eq('invoice_id', id);
+        if (linesErr) console.warn('Direct lines delete warning:', linesErr);
+        const { error: invErr } = await supabase.from('invoices').delete().eq('id', id);
+        if (invErr) throw invErr;
+      }
+      navigate('/bills');
+    } catch (err) {
+      console.error('Failed to delete invoice:', err);
+      setDeleteError(err.message || 'Could not delete invoice.');
+      setIsDeleting(false);
+    }
+  };
+
+  // Action: Cancel Invoice (Phase 7)
+  const handleConfirmCancel = async () => {
+    if (isCancelling) return;
+    setIsCancelling(true);
+    setCancelError('');
+    try {
+      const { error: rpcErr } = await supabase.rpc('cancel_invoice', { invoice_id: id });
+      if (rpcErr) {
+        // Fallback direct update
+        const { error: updateErr } = await supabase
+          .from('invoices')
+          .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
+          .eq('id', id);
+        if (updateErr) throw updateErr;
+      }
+      setInvoice((prev) => ({
+        ...prev,
+        status: 'cancelled',
+        cancelled_at: new Date().toISOString(),
+      }));
+      setShowCancelModal(false);
+    } catch (err) {
+      console.error('Failed to cancel invoice:', err);
+      setCancelError(err.message || 'Could not cancel invoice.');
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -220,7 +282,7 @@ export default function BillView() {
   const labelCopiesEnabled = isLabelCopiesEnabled();
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-28 sm:pb-12">
       {/* Top Navigation & Primary Action Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
         <div className="flex items-center space-x-3">
@@ -257,16 +319,73 @@ export default function BillView() {
               A4 Print Preview
             </button>
           </div>
+
+          {/* Copy as New Bill Button (Phase 7) */}
+          <Link
+            to={`/new?copyFrom=${id}`}
+            className="inline-flex items-center space-x-1.5 text-sm font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-3.5 py-2 rounded-xl hover:bg-emerald-100 transition min-h-[44px]"
+            title="Duplicate items and details into a new bill"
+          >
+            <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span>Copy as New</span>
+          </Link>
+
+          {/* Edit Bill Button (disabled if cancelled) */}
+          {!isCancelled && (
+            <Link
+              to={`/bills/${id}/edit`}
+              className="inline-flex items-center space-x-1.5 text-sm font-bold text-blue-700 bg-blue-50 border border-blue-300 px-3.5 py-2 rounded-xl hover:bg-blue-100 transition min-h-[44px]"
+            >
+              <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <span>Edit</span>
+            </Link>
+          )}
+
+          {/* Cancel Bill Button (Phase 7) */}
+          {!isCancelled && (
+            <button
+              type="button"
+              onClick={() => {
+                setCancelError('');
+                setShowCancelModal(true);
+              }}
+              className="inline-flex items-center space-x-1.5 text-sm font-bold text-amber-800 bg-amber-50 border border-amber-300 px-3.5 py-2 rounded-xl hover:bg-amber-100 transition min-h-[44px] cursor-pointer"
+            >
+              <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+              </svg>
+              <span>Cancel</span>
+            </button>
+          )}
+
+          {/* Delete Bill Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteError('');
+              setShowDeleteModal(true);
+            }}
+            className="inline-flex items-center space-x-1.5 text-sm font-bold text-red-700 bg-red-50 border border-red-300 px-3.5 py-2 rounded-xl hover:bg-red-100 transition min-h-[44px] cursor-pointer"
+          >
+            <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span>Delete</span>
+          </button>
         </div>
 
-        {/* Big Print / Share Primary Button */}
+        {/* Big Print / Share Primary Button (Desktop/Tablet) */}
         <button
           type="button"
           onClick={() => {
             setPdfMessage('');
             setShowPrintModal(true);
           }}
-          className="min-h-[50px] px-6 py-2.5 rounded-2xl bg-blue-700 text-white font-black text-base hover:bg-blue-800 shadow-md flex items-center justify-center space-x-2 active:scale-[0.98] transition cursor-pointer"
+          className="hidden sm:inline-flex min-h-[50px] px-6 py-2.5 rounded-2xl bg-blue-700 text-white font-black text-base hover:bg-blue-800 shadow-md items-center justify-center space-x-2 active:scale-[0.98] transition cursor-pointer"
         >
           <svg className="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -534,17 +653,35 @@ export default function BillView() {
 
       {/* Screen Mode: A4 Invoice Preview */}
       {viewMode === 'preview' && (
-        <div className="no-print screen-only overflow-x-auto p-4 bg-slate-200/60 rounded-3xl border-2 border-slate-300">
+        <div className="no-print screen-only p-2 sm:p-4 bg-slate-200/60 rounded-3xl border-2 border-slate-300">
           <div className="text-center pb-3 text-xs font-bold text-slate-500 uppercase tracking-wider">
-            A4 Portrait Bill Preview (Single Component Representation)
+            A4 Portrait Bill Preview
           </div>
           <InvoiceSheet
             invoice={invoice}
             firmProfile={firmProfile}
             copyLabel={getCopyLabel(0, labelCopiesEnabled)}
+            scaleToFit={true}
           />
         </div>
       )}
+
+      {/* Sticky Mobile Print/Share Button (pinned to viewport bottom on phones) */}
+      <div className="fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur-md border-t border-slate-300 shadow-xl sm:hidden z-30 no-print flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            setPdfMessage('');
+            setShowPrintModal(true);
+          }}
+          className="w-full min-h-[48px] px-4 py-2.5 rounded-2xl bg-blue-700 text-white font-black text-base hover:bg-blue-800 shadow-md flex items-center justify-center space-x-2 active:scale-[0.98] transition cursor-pointer"
+        >
+          <svg className="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+          </svg>
+          <span>Print / Share Bill</span>
+        </button>
+      </div>
 
       {/* DIALOG MODAL: "How many copies?" & 3 Actions (Print / Share PDF / Download PDF) */}
       {showPrintModal && (
@@ -661,17 +798,106 @@ export default function BillView() {
         </div>
       )}
 
-      {/* OFF-SCREEN & PRINT CONTAINER:
-          This container renders all N copies of the invoice sheets for browser window.print()
-          and off-screen html2canvas PDF rendering.
+      {/* DELETE CONFIRMATION MODAL */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 no-print">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border-2 border-red-400 space-y-4">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-red-100 text-red-700 flex items-center justify-center">
+              <svg className="w-8 h-8 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-xl font-black text-slate-900">Delete This Bill?</h3>
+              <p className="text-sm font-semibold text-slate-600">
+                Are you sure you want to permanently delete bill{' '}
+                <span className="font-mono font-bold text-slate-900">{invoice.invoice_no}</span>?
+                This action cannot be undone.
+              </p>
+            </div>
+
+            {deleteError && (
+              <div className="p-3 bg-red-50 border border-red-300 rounded-xl text-xs font-bold text-red-900">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="flex space-x-3 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 min-h-[48px] rounded-xl border-2 border-slate-300 font-bold text-slate-700 hover:bg-slate-100"
+              >
+                Keep Bill
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+                className="flex-1 min-h-[48px] rounded-xl bg-red-600 text-white font-black hover:bg-red-700 disabled:opacity-50"
+              >
+                {isDeleting ? 'Deleting...' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CANCEL CONFIRMATION MODAL (Phase 7) */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 no-print">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border-2 border-amber-400 space-y-4">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center">
+              <svg className="w-8 h-8 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-xl font-black text-slate-900">Cancel Bill {invoice.invoice_no}?</h3>
+              <p className="text-sm font-semibold text-slate-600">
+                Are you sure you want to cancel this bill? The invoice will be stamped{' '}
+                <strong className="text-red-700">CANCELLED &amp; VOID</strong>, and excluded from sales reports totals.
+                The number will be retained in your sequence.
+              </p>
+            </div>
+
+            {cancelError && (
+              <div className="p-3 bg-red-50 border border-red-300 rounded-xl text-xs font-bold text-red-900">
+                {cancelError}
+              </div>
+            )}
+
+            <div className="flex space-x-3 pt-2">
+              <button
+                type="button"
+                disabled={isCancelling}
+                onClick={() => setShowCancelModal(false)}
+                className="flex-1 min-h-[48px] rounded-xl border-2 border-slate-300 font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                Keep Active
+              </button>
+              <button
+                type="button"
+                disabled={isCancelling}
+                onClick={handleConfirmCancel}
+                className="flex-1 min-h-[48px] rounded-xl bg-amber-600 text-white font-black hover:bg-amber-700 disabled:opacity-50 cursor-pointer"
+              >
+                {isCancelling ? 'Cancelling...' : 'Yes, Cancel Bill'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BROWSER PRINT CONTAINER:
+          Renders N copies (e.g. 3 copies) for window.print() only.
+          Hidden completely on screen so layout never breaks.
       */}
       <div
         id="print-container"
-        className="print:block"
+        className="hidden print:block"
         style={{
-          position: 'absolute',
-          left: '-99999px',
-          top: '0',
           width: '210mm',
         }}
       >
@@ -681,7 +907,7 @@ export default function BillView() {
             <React.Fragment key={cIdx}>
               {paginatedPages.map((page) => (
                 <InvoicePage
-                  key={`${cIdx}-${page.pageNumber}`}
+                  key={`print-${cIdx}-${page.pageNumber}`}
                   invoice={invoice}
                   firmProfile={firmProfile}
                   page={page}
@@ -691,6 +917,35 @@ export default function BillView() {
             </React.Fragment>
           );
         })}
+      </div>
+
+      {/* OFF-SCREEN PDF CONTAINER:
+          Renders strictly ONE single clean format without copy labels (Original/Duplicate/etc)
+          for html2canvas PDF download and sharing.
+          Positioned off-screen safely so viewport never shifts or breaks.
+      */}
+      <div
+        id="pdf-download-container"
+        className="no-print pointer-events-none select-none"
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: '-9999px',
+          width: '210mm',
+          opacity: 0,
+          zIndex: -9999,
+        }}
+      >
+        {paginatedPages.map((page) => (
+          <InvoicePage
+            key={`pdf-${page.pageNumber}`}
+            invoice={invoice}
+            firmProfile={firmProfile}
+            page={page}
+            copyLabel=""
+          />
+        ))}
       </div>
     </div>
   );

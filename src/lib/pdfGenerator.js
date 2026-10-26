@@ -21,7 +21,7 @@ export async function generateInvoicePdfBlob(pageElements, { scale = 2, jpegQual
   // Lazy-load libraries on-demand
   const [{ jsPDF }, html2canvasModule] = await Promise.all([
     import('jspdf'),
-    import('html2canvas'),
+    import('html2canvas-pro'),
   ]);
   const html2canvas = html2canvasModule.default || html2canvasModule;
 
@@ -41,7 +41,32 @@ export async function generateInvoicePdfBlob(pageElements, { scale = 2, jpegQual
       useCORS: true,
       logging: false,
       backgroundColor: '#ffffff',
-      windowWidth: pageEl.scrollWidth || 794,
+      windowWidth: 794,
+      onclone: (clonedDoc, clonedEl) => {
+        // Reset scale transforms and offscreen positioning on cloned DOM so capture is always full-resolution A4
+        let cur = clonedEl;
+        while (cur && cur !== clonedDoc.body) {
+          if (cur.style) {
+            if (cur.style.transform && cur.style.transform.includes('scale')) {
+              cur.style.transform = 'none';
+            }
+            if (cur.style.position === 'fixed' || cur.style.position === 'absolute') {
+              cur.style.position = 'static';
+              cur.style.left = '0';
+              cur.style.top = '0';
+            }
+            if (cur.style.opacity === '0') {
+              cur.style.opacity = '1';
+            }
+          }
+          if (cur.classList && cur.classList.contains('invoice-scale-wrapper')) {
+            cur.style.width = '794px';
+            cur.style.height = 'auto';
+            cur.style.overflow = 'visible';
+          }
+          cur = cur.parentElement;
+        }
+      },
     });
 
     const imgData = canvas.toDataURL('image/jpeg', jpegQuality);

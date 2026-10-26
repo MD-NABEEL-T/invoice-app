@@ -1,8 +1,25 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import PwaInstallPrompt from './PwaInstallPrompt.jsx';
 
 export default function AppShell() {
   const location = useLocation();
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const navItems = [
     {
@@ -78,6 +95,16 @@ export default function AppShell() {
 
       {/* Main Content Area */}
       <main className="flex-1 w-full max-w-2xl mx-auto px-4 py-5 pb-28">
+        {!isOnline && (
+          <div
+            role="alert"
+            className="p-3 mb-4 rounded-xl bg-amber-100 border-2 border-amber-500 text-amber-950 font-bold text-xs flex items-center space-x-2 no-print shadow-sm"
+          >
+            <span>📡</span>
+            <span>You are currently offline. Viewing cached app data.</span>
+          </div>
+        )}
+        <PwaInstallPrompt />
         <Outlet />
       </main>
 
