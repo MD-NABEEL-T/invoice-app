@@ -1,0 +1,21 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Prevent caching of Service Worker so updates are immediate
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    cache-control = "no-cache, no-store, must-revalidate"
+
+# Manifest header
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    content-type = "application/manifest+json; charset=utf-8"
+    cache-control = "public, max-age=0, must-revalidate"
