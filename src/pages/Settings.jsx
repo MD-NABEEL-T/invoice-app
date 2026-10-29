@@ -61,13 +61,21 @@ export default function Settings() {
       return '';
     }
   });
+  const [notificationEmail, setNotificationEmail] = useState(() => {
+    try {
+      return localStorage.getItem('khansa_notification_email') || 'khansaenterprises19@gmail.com';
+    } catch {
+      return 'khansaenterprises19@gmail.com';
+    }
+  });
   const [webhookStatus, setWebhookStatus] = useState('');
 
   const handleSaveWebhook = (e) => {
     e.preventDefault();
     try {
       localStorage.setItem('khansa_gsheet_webhook_url', webhookUrl.trim());
-      setWebhookStatus('Webhook URL saved successfully!');
+      localStorage.setItem('khansa_notification_email', notificationEmail.trim());
+      setWebhookStatus('Automation & Email settings saved successfully!');
       setTimeout(() => setWebhookStatus(''), 4000);
     } catch (err) {
       setWebhookStatus(`Failed to save: ${err.message}`);
@@ -683,8 +691,7 @@ export default function Settings() {
         </div>
 
         <p className="text-xs font-medium text-slate-600 leading-relaxed">
-          Automatically dispatch each finalized bill to Google Sheets and send email notification to{' '}
-          <strong className="text-slate-900 font-bold">khansaenterprises19@gmail.com</strong>.
+          Automatically dispatch each finalized or edited bill copy to Google Sheets and send full email notifications.
         </p>
 
         {webhookStatus && (
@@ -693,10 +700,24 @@ export default function Settings() {
           </div>
         )}
 
-        <form onSubmit={handleSaveWebhook} className="space-y-3">
+        <form onSubmit={handleSaveWebhook} className="space-y-3.5">
+          <div>
+            <label htmlFor="notificationEmailInput" className="block text-sm font-bold text-slate-900 mb-1">
+              Recipient Email for Bill Copies
+            </label>
+            <input
+              id="notificationEmailInput"
+              type="email"
+              value={notificationEmail}
+              onChange={(e) => setNotificationEmail(e.target.value)}
+              placeholder="e.g. khansaenterprises19@gmail.com"
+              className="w-full min-h-[48px] px-4 py-2.5 rounded-xl border-2 border-slate-400 bg-white text-slate-900 text-sm focus:border-slate-900"
+            />
+          </div>
+
           <div>
             <label htmlFor="webhookUrlInput" className="block text-sm font-bold text-slate-900 mb-1">
-              Apps Script Webhook URL (POST)
+              Google Apps Script Webhook URL (POST)
             </label>
             <input
               id="webhookUrlInput"
@@ -713,20 +734,22 @@ export default function Settings() {
               type="submit"
               className="min-h-[44px] px-5 py-2 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 cursor-pointer"
             >
-              Save Webhook URL
+              Save Automation Settings
             </button>
-            {webhookUrl && (
+            {(webhookUrl || notificationEmail !== 'khansaenterprises19@gmail.com') && (
               <button
                 type="button"
                 onClick={() => {
                   setWebhookUrl('');
+                  setNotificationEmail('khansaenterprises19@gmail.com');
                   localStorage.removeItem('khansa_gsheet_webhook_url');
-                  setWebhookStatus('Webhook URL removed.');
+                  localStorage.removeItem('khansa_notification_email');
+                  setWebhookStatus('Webhook settings reset.');
                   setTimeout(() => setWebhookStatus(''), 3000);
                 }}
                 className="min-h-[44px] px-3.5 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-50 cursor-pointer"
               >
-                Clear
+                Reset
               </button>
             )}
           </div>

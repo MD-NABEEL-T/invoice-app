@@ -753,6 +753,62 @@ export default function NewBill() {
 
       const payload = buildInvoicePayload({ header, lines });
 
+      // Webhook dispatch helper for email and Google Sheets automation
+      const sendBillEmailWebhook = (invoiceNo, isEdit = false) => {
+        const webhookUrl = localStorage.getItem('khansa_gsheet_webhook_url');
+        if (!webhookUrl) return;
+
+        const emailTo = localStorage.getItem('khansa_notification_email') || 'khansaenterprises19@gmail.com';
+        const emailPayload = {
+          action: isEdit ? 'Bill Edited' : 'New Bill Created',
+          invoice_no: invoiceNo,
+          date: header.invoice_date,
+          buyer_name: header.buyer_name,
+          buyer_address: header.buyer_address,
+          buyer_order_no: header.buyer_order_no,
+          buyer_order_date: header.buyer_order_date,
+          delivery_no: header.delivery_no,
+          delivery_date: header.delivery_date,
+          despatched_through: header.despatched_through,
+          destination: header.destination,
+          terms_of_delivery: header.terms_of_delivery,
+          taxable_paise: payload.taxable_paise,
+          cgst_paise: payload.cgst_paise,
+          sgst_paise: payload.sgst_paise,
+          payable_paise: payload.payable_paise,
+          taxable_rupees: (payload.taxable_paise / 100).toFixed(2),
+          cgst_rupees: (payload.cgst_paise / 100).toFixed(2),
+          sgst_rupees: (payload.sgst_paise / 100).toFixed(2),
+          payable_rupees: (payload.payable_paise / 100).toFixed(2),
+          lines: lines.map((l) => {
+            const qtyMilli = parseQuantityToMilli(l.quantity);
+            const ratePaise = parseRupeesToPaise(l.rate);
+            const lineTotalPaise = Math.round((qtyMilli * ratePaise) / 1000);
+            return {
+              description: l.description,
+              hsn: l.hsn,
+              quantity: l.quantity,
+              unit: l.unit,
+              rate: l.rate,
+              gst_percent: l.gst_percent,
+              amount_rupees: (lineTotalPaise / 100).toFixed(2),
+            };
+          }),
+          email_to: emailTo,
+        };
+
+        try {
+          fetch(webhookUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(emailPayload),
+          }).catch((e) => console.warn('Webhook dispatch error:', e));
+        } catch (e) {
+          console.warn('Webhook trigger error:', e);
+        }
+      };
+
       if (isEditMode) {
         // Edit mode: update existing invoice
         const { error: rpcErr } = await supabase.rpc('update_invoice', {
@@ -802,30 +858,8 @@ export default function NewBill() {
           if (linesErr) throw linesErr;
         }
 
-        // Webhook dispatch
-        const webhookUrl = localStorage.getItem('khansa_gsheet_webhook_url');
-        if (webhookUrl) {
-          try {
-            fetch(webhookUrl, {
-              method: 'POST',
-              mode: 'no-cors',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                invoice_no: existingInvoice?.invoice_no,
-                date: header.invoice_date,
-                buyer_name: header.buyer_name,
-                buyer_order_no: header.buyer_order_no,
-                taxable_paise: payload.taxable_paise,
-                cgst_paise: payload.cgst_paise,
-                sgst_paise: payload.sgst_paise,
-                payable_paise: payload.payable_paise,
-                email_to: 'khansaenterprises19@gmail.com',
-              }),
-            }).catch(e => console.warn('Webhook dispatch error:', e));
-          } catch (e) {
-            console.warn('Webhook trigger error:', e);
-          }
-        }
+        // Webhook dispatch on bill edit
+        sendBillEmailWebhook(existingInvoice?.invoice_no, true);
 
         setSaveModalOpen(false);
         navigate(`/bills/${editBillId}`);
@@ -842,30 +876,8 @@ export default function NewBill() {
         throw new Error('No invoice record returned by server');
       }
 
-      // Trigger Webhook on new bill
-      const webhookUrl = localStorage.getItem('khansa_gsheet_webhook_url');
-      if (webhookUrl) {
-        try {
-          fetch(webhookUrl, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              invoice_no: data.invoice_no,
-              date: header.invoice_date,
-              buyer_name: header.buyer_name,
-              buyer_order_no: header.buyer_order_no,
-              taxable_paise: payload.taxable_paise,
-              cgst_paise: payload.cgst_paise,
-              sgst_paise: payload.sgst_paise,
-              payable_paise: payload.payable_paise,
-              email_to: 'khansaenterprises19@gmail.com',
-            }),
-          }).catch(e => console.warn('Webhook dispatch error:', e));
-        } catch (e) {
-          console.warn('Webhook trigger error:', e);
-        }
-      }
+      // Webhook dispatch on bill create
+      sendBillEmailWebhook(data.invoice_no, false);
 
       // Successful save: clear draft and redirect to bill view
       try {
