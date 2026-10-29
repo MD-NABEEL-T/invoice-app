@@ -130,7 +130,7 @@ export default function Bills() {
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
                       {formatDisplayDate(inv.invoice_date)}
                     </span>
-                    <h3 className="text-xl font-black font-mono text-slate-900 leading-tight">
+                    <h3 className="text-xl font-black font-mono text-slate-900 leading-tight whitespace-nowrap">
                       {inv.invoice_no}
                     </h3>
                   </div>

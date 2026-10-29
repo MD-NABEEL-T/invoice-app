@@ -80,29 +80,29 @@ export default function Home() {
   return (
     <div className="space-y-6">
       {/* Firm Header */}
-      <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center space-x-3.5">
+      <div className="bg-white rounded-2xl border-2 border-slate-300 p-4 sm:p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-2.5 sm:gap-3">
+          <div className="flex items-center space-x-2.5 sm:space-x-3.5 min-w-0">
             <img
               src="/KhansaEnterprises.jpg"
               alt="Khansa Enterprises Logo"
-              className="w-12 h-12 rounded-xl object-contain bg-white border border-slate-200 shadow-sm p-0.5 shrink-0"
+              className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl object-contain bg-white border border-slate-200 shadow-sm p-0.5 shrink-0"
             />
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider truncate">
                 Supplier Business
               </p>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-0.5">
+              <h2 className="text-base sm:text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-tight mt-0.5 truncate">
                 {firmName}
               </h2>
             </div>
           </div>
           {isNumberingSet && nextBillNo && (
-            <div className="text-right">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+            <div className="text-right shrink-0">
+              <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider block whitespace-nowrap">
                 Next Bill
               </span>
-              <span className="text-lg font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-xl border border-blue-200 inline-block mt-0.5">
+              <span className="text-sm sm:text-lg font-black text-blue-700 bg-blue-50 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-xl border border-blue-200 inline-block mt-0.5 whitespace-nowrap font-mono tracking-tight">
                 {nextBillNo}
               </span>
             </div>
@@ -253,7 +253,7 @@ export default function Home() {
                   {/* Top row: Invoice No & Tag / Date */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center space-x-2">
-                      <span className="text-lg font-black text-slate-950">
+                      <span className="text-lg font-black text-slate-950 font-mono whitespace-nowrap">
                         {inv.invoice_no}
                       </span>
                       {isCancelled && (
