@@ -73,7 +73,7 @@ export default function AppShell() {
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
       {/* Top Header */}
       <header className="sticky top-0 z-20 bg-slate-900 text-white shadow-md border-b-2 border-slate-950 px-4 py-3 sm:px-6">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
             <img
               src="/KhansaEnterprises.jpg"
@@ -96,7 +96,7 @@ export default function AppShell() {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-2xl mx-auto px-4 py-5 pb-28">
+      <main className="flex-1 w-full max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-28">
         {!isOnline && (
           <div
             role="alert"
@@ -113,9 +113,9 @@ export default function AppShell() {
       {/* Bottom Navigation Bar */}
       <nav
         aria-label="Bottom Navigation"
-        className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t-2 border-slate-300 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]"
+        className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t-2 border-slate-300 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom)]"
       >
-        <div className="max-w-2xl mx-auto grid grid-cols-5 h-20">
+        <div className="max-w-4xl mx-auto grid grid-cols-5 h-20">
           {navItems.map((item) => {
             const isActive = location.pathname === item.to;
             return (

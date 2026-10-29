@@ -27,11 +27,17 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png'],
+      includeAssets: [
+        'favicon.png',
+        'apple-touch-icon.png',
+        'icons/icon-192.png',
+        'icons/icon-512.png',
+        'KhansaEnterprises.jpg',
+      ],
       manifest: {
         id: '/',
         name: 'Khansa Enterprises - Invoices',
-        short_name: 'Invoices',
+        short_name: 'Khansa Invoices',
         description: 'GST Invoicing for Khansa Enterprises',
         theme_color: '#0f172a',
         background_color: '#ffffff',
@@ -57,6 +63,12 @@ export default defineConfig({
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
+          },
+          {
+            src: '/KhansaEnterprises.jpg',
+            sizes: '1254x1254',
+            type: 'image/jpeg',
+            purpose: 'any',
           },
         ],
       },

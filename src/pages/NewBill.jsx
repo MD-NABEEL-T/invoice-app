@@ -1621,8 +1621,8 @@ export default function NewBill() {
       </div>
 
       {/* STICKY BOTTOM BAR */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900 text-white shadow-2xl border-t border-slate-700">
-        <div className="max-w-xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900 text-white shadow-2xl border-t border-slate-700 pb-[env(safe-area-inset-bottom)]">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <div>
             <span className="text-xs uppercase font-bold text-slate-400 block">
               Grand Total

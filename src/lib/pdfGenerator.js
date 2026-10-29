@@ -39,32 +39,77 @@ export async function generateInvoicePdfBlob(pageElements, { scale = 2, jpegQual
     const canvas = await html2canvas(pageEl, {
       scale,
       useCORS: true,
+      allowTaint: true,
       logging: false,
       backgroundColor: '#ffffff',
+      width: 794,
       windowWidth: 794,
-      onclone: (clonedDoc, clonedEl) => {
-        // Reset scale transforms and offscreen positioning on cloned DOM so capture is always full-resolution A4
-        let cur = clonedEl;
+      scrollX: 0,
+      scrollY: 0,
+      x: 0,
+      y: 0,
+      onclone: async (clonedDoc, clonedEl) => {
+        // 1. Force clonedDoc root and body to exact 794px A4 width with zero scroll/margin
+        if (clonedDoc.documentElement) {
+          clonedDoc.documentElement.style.width = '794px';
+          clonedDoc.documentElement.style.minWidth = '794px';
+          clonedDoc.documentElement.style.margin = '0';
+          clonedDoc.documentElement.style.padding = '0';
+          clonedDoc.documentElement.style.overflow = 'visible';
+        }
+        if (clonedDoc.body) {
+          clonedDoc.body.style.width = '794px';
+          clonedDoc.body.style.minWidth = '794px';
+          clonedDoc.body.style.margin = '0';
+          clonedDoc.body.style.padding = '0';
+          clonedDoc.body.style.overflow = 'visible';
+        }
+
+        // 2. Unconstrain and reset clonedEl explicitly to 794px A4 dimensions
+        if (clonedEl && clonedEl.style) {
+          clonedEl.style.width = '794px';
+          clonedEl.style.minWidth = '794px';
+          clonedEl.style.maxWidth = '794px';
+          clonedEl.style.transform = 'none';
+          clonedEl.style.margin = '0';
+          clonedEl.style.position = 'static';
+          clonedEl.style.opacity = '1';
+        }
+
+        // 3. Reset all ancestor containers up to body
+        let cur = clonedEl ? clonedEl.parentElement : null;
         while (cur && cur !== clonedDoc.body) {
           if (cur.style) {
-            if (cur.style.transform && cur.style.transform.includes('scale')) {
-              cur.style.transform = 'none';
-            }
-            if (cur.style.position === 'fixed' || cur.style.position === 'absolute') {
-              cur.style.position = 'static';
-              cur.style.left = '0';
-              cur.style.top = '0';
-            }
-            if (cur.style.opacity === '0') {
-              cur.style.opacity = '1';
-            }
-          }
-          if (cur.classList && cur.classList.contains('invoice-scale-wrapper')) {
+            cur.style.position = 'static';
+            cur.style.left = '0';
+            cur.style.top = '0';
+            cur.style.opacity = '1';
+            cur.style.transform = 'none';
             cur.style.width = '794px';
-            cur.style.height = 'auto';
+            cur.style.maxWidth = 'none';
+            cur.style.minWidth = '794px';
             cur.style.overflow = 'visible';
+            cur.style.margin = '0';
+            cur.style.padding = '0';
           }
           cur = cur.parentElement;
+        }
+
+        // 4. Ensure all images inside clonedDoc (including logo) are fully decoded
+        try {
+          const imgs = Array.from(clonedDoc.querySelectorAll('img'));
+          await Promise.all(
+            imgs.map((img) => {
+              if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+              return new Promise((resolve) => {
+                img.onload = resolve;
+                img.onerror = resolve;
+                setTimeout(resolve, 300); // 300ms ceiling so capture never hangs
+              });
+            })
+          );
+        } catch {
+          // Non-blocking fallback
         }
       },
     });
@@ -97,12 +142,21 @@ export function downloadInvoicePdf(blob, filename = 'invoice.pdf') {
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
   document.body.appendChild(a);
   a.click();
+  // Retain object URL for 60 seconds so mobile OS / slow download handlers have time to read blob
   setTimeout(() => {
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, 200);
+    try {
+      if (document.body.contains(a)) {
+        document.body.removeChild(a);
+      }
+      URL.revokeObjectURL(url);
+    } catch {
+      // Ignore cleanup error
+    }
+  }, 60000);
 }
 
 /**

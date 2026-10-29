@@ -18,37 +18,59 @@ body {
 }
 
 /* ==========================================================================
-   Print-specific CSS for A4 Invoices (Phase 6)
+   Print-specific CSS for A4 Invoices (Mobile, Tablet, Desktop)
    ========================================================================== */
 @media print {
   @page {
-    size: A4 portrait;
-    margin: 8mm 10mm;
+    size: 210mm 297mm;
+    margin: 6mm 8mm;
   }
 
-  body {
-    background: #ffffff !important;
-    color: #000000 !important;
+  html, body {
+    width: 210mm !important;
+    min-width: 210mm !important;
     margin: 0 !important;
     padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
     font-size: 11px !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  /* Hide navigation, toolbars, buttons, dialog overlays */
-  nav, header, footer, .no-print, button, .app-shell-nav, .fixed {
-    display: none !important;
+  /* Unconstrain and reset all app wrappers for print so mobile screens don't squeeze A4 pages */
+  #root,
+  #root > div,
+  main,
+  .invoice-scale-outer,
+  .invoice-scale-wrapper,
+  .invoice-scale-inner,
+  .space-y-6 {
+    width: 210mm !important;
+    max-width: none !important;
+    min-width: 210mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    display: block !important;
+    transform: none !important;
   }
 
-  /* Hide all regular screen content when printing container is active */
-  .screen-only {
+  /* Hide navigation, toolbars, buttons, dialog overlays, and screen-only elements */
+  nav, header, footer, .no-print, button, .app-shell-nav, .fixed, .screen-only {
     display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
   }
 
   #print-container {
     display: block !important;
     visibility: visible !important;
     position: static !important;
-    width: 100% !important;
+    width: 210mm !important;
     margin: 0 !important;
     padding: 0 !important;
   }
@@ -58,33 +80,23 @@ body {
   }
 
   .invoice-page {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-height: 275mm !important;
+    width: 210mm !important;
+    max-width: 210mm !important;
+    min-width: 210mm !important;
+    min-height: 297mm !important;
     box-shadow: none !important;
     page-break-after: always !important;
     break-after: page !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
-    margin: 0 auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    background: #ffffff !important;
   }
 
   .invoice-page:last-child {
     page-break-after: auto !important;
     break-after: auto !important;
-  }
-
-  /* Unscale preview container for print */
-  .invoice-scale-outer,
-  .invoice-scale-wrapper {
-    width: 100% !important;
-    height: auto !important;
-    overflow: visible !important;
-    margin: 0 !important;
-  }
-
-  .invoice-scale-inner {
-    width: 100% !important;
-    transform: none !important;
   }
 }

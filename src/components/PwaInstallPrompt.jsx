@@ -75,9 +75,11 @@ export default function PwaInstallPrompt() {
       className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white p-3.5 rounded-2xl border-2 border-blue-400 shadow-xl mb-4 flex items-center justify-between gap-3 no-print"
     >
       <div className="flex items-center space-x-3">
-        <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center font-black text-lg text-white shrink-0 shadow-md">
-          K
-        </div>
+        <img
+          src="/KhansaEnterprises.jpg"
+          alt="Khansa Enterprises Logo"
+          className="w-11 h-11 rounded-xl object-contain bg-white border border-blue-400 p-0.5 shadow-md shrink-0"
+        />
         <div>
           <p className="text-sm font-black tracking-wide leading-tight">
             Install Khansa Invoices App

@@ -530,6 +530,26 @@ export default function Settings() {
           </div>
         ) : (
           <form onSubmit={handleSaveFirm} className="space-y-4">
+            {/* Logo Preview */}
+            <div className="flex items-center space-x-3.5 p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+              <img
+                src="/KhansaEnterprises.jpg"
+                alt="Khansa Enterprises Logo"
+                className="w-14 h-14 rounded-xl object-contain bg-white border border-slate-300 p-0.5 shadow-xs shrink-0"
+              />
+              <div>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Registered Invoice Logo
+                </p>
+                <p className="text-base font-black text-slate-900">
+                  Khansa Enterprises
+                </p>
+                <p className="text-xs text-slate-500 font-medium">
+                  Displayed on all invoices, A4 prints, downloads &amp; PWA
+                </p>
+              </div>
+            </div>
+
             {/* Firm Name */}
             <div>
               <label htmlFor="firmName" className="block text-base font-bold text-slate-900 mb-1">

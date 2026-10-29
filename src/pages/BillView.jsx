@@ -138,10 +138,10 @@ export default function BillView() {
   // Action (a): Browser Print
   const handlePrint = () => {
     setShowPrintModal(false);
-    // Slight tick to let modal close before print dialog freezes UI
+    // 300ms tick to let modal unmount and mobile layout stabilize before print
     setTimeout(() => {
       window.print();
-    }, 100);
+    }, 300);
   };
 
   // Action (b) & (c): PDF generation for Share / Download
@@ -932,7 +932,7 @@ export default function BillView() {
           position: 'fixed',
           top: 0,
           left: '-9999px',
-          width: '210mm',
+          width: '794px',
           opacity: 0,
           zIndex: -9999,
         }}

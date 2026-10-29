@@ -81,14 +81,21 @@ export default function Home() {
     <div className="space-y-6">
       {/* Firm Header */}
       <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 shadow-sm">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Supplier Business
-            </p>
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight mt-0.5">
-              {firmName}
-            </h2>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center space-x-3.5">
+            <img
+              src="/KhansaEnterprises.jpg"
+              alt="Khansa Enterprises Logo"
+              className="w-12 h-12 rounded-xl object-contain bg-white border border-slate-200 shadow-sm p-0.5 shrink-0"
+            />
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Supplier Business
+              </p>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-0.5">
+                {firmName}
+              </h2>
+            </div>
           </div>
           {isNumberingSet && nextBillNo && (
             <div className="text-right">
