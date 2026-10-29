@@ -242,19 +242,27 @@ export function InvoicePage({
           className="w-7/12 p-2.5 flex flex-col justify-between"
           style={{ borderRight: '1px solid #000000' }}
         >
-          <div>
-            <h2
-              className="text-sm font-black uppercase tracking-wide leading-tight mb-1"
-              style={{ color: '#000000' }}
-            >
-              {firm.name || 'KHANSA ENTERPRISES'}
-            </h2>
-            <p
-              className="text-[10px] whitespace-pre-line leading-snug font-medium mb-1.5"
-              style={{ color: '#1f2937' }}
-            >
-              {firm.address}
-            </p>
+          <div className="flex items-start gap-2">
+            <img
+              src="/KhansaEnterprises.jpg"
+              alt="Logo"
+              style={{ width: '40px', height: '40px', objectFit: 'contain' }}
+              className="shrink-0 rounded"
+            />
+            <div className="flex-1 min-w-0">
+              <h2
+                className="text-sm font-black uppercase tracking-wide leading-tight mb-0.5"
+                style={{ color: '#000000' }}
+              >
+                {firm.name || 'KHANSA ENTERPRISES'}
+              </h2>
+              <p
+                className="text-[10px] whitespace-pre-line leading-snug font-medium mb-1"
+                style={{ color: '#1f2937' }}
+              >
+                {firm.address}
+              </p>
+            </div>
           </div>
           <div
             className="text-[10px] space-y-0.5 font-semibold pt-1"

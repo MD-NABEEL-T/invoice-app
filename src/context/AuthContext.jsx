@@ -67,9 +67,11 @@ export function AuthProvider({ children }) {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white font-sans">
-        <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center font-black text-2xl text-white shadow-lg mb-4">
-          K
-        </div>
+        <img
+          src="/KhansaEnterprises.jpg"
+          alt="Khansa Enterprises Logo"
+          className="w-16 h-16 rounded-2xl object-contain bg-white shadow-lg mb-4 p-1 border border-slate-700"
+        />
         <div className="w-8 h-8 border-3 border-blue-400/30 border-t-blue-500 rounded-full animate-spin"></div>
         <p className="mt-4 text-sm font-bold tracking-wide uppercase text-slate-300">
           Khansa Enterprises

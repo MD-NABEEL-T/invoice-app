@@ -75,9 +75,11 @@ export default function AppShell() {
       <header className="sticky top-0 z-20 bg-slate-900 text-white shadow-md border-b-2 border-slate-950 px-4 py-3 sm:px-6">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-black text-white text-base">
-              K
-            </div>
+            <img
+              src="/KhansaEnterprises.jpg"
+              alt="Khansa Enterprises Logo"
+              className="w-9 h-9 rounded-xl object-contain bg-white border border-slate-700 shadow-sm p-0.5"
+            />
             <div>
               <h1 className="text-lg font-black tracking-wide leading-tight uppercase">
                 Khansa Enterprises

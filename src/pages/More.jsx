@@ -177,17 +177,24 @@ export default function More() {
   return (
     <div className="space-y-6">
       {/* Business Info Box */}
-      <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 shadow-sm">
-        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-          Business Profile
-        </p>
-        <p className="text-lg font-black text-slate-900 mt-1">
-          Khansa Enterprises
-        </p>
-        <p className="text-xs font-semibold text-emerald-700 mt-1 flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block"></span>
-          GST Intra-State Invoicing System
-        </p>
+      <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 shadow-sm flex items-center space-x-4">
+        <img
+          src="/KhansaEnterprises.jpg"
+          alt="Khansa Enterprises"
+          className="w-14 h-14 rounded-xl object-contain border border-slate-200 p-1 shrink-0 bg-white shadow-xs"
+        />
+        <div>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            Business Profile
+          </p>
+          <p className="text-lg font-black text-slate-900 mt-0.5">
+            Khansa Enterprises
+          </p>
+          <p className="text-xs font-semibold text-emerald-700 mt-0.5 flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block"></span>
+            GST Intra-State Invoicing System
+          </p>
+        </div>
       </div>
 
       {/* Menu List */}
