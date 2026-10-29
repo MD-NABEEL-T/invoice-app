@@ -20,3 +20,4 @@ Resize-Image "public/KhansaEnterprises.jpg" "public/icons/icon-192.png" 192 192
 Resize-Image "public/KhansaEnterprises.jpg" "public/icons/icon-512.png" 512 512
 Resize-Image "public/KhansaEnterprises.jpg" "public/apple-touch-icon.png" 180 180
 Resize-Image "public/KhansaEnterprises.jpg" "public/favicon.png" 64 64
+

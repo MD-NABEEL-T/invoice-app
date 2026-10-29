@@ -8,3 +8,4 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="
 
 fs.writeFileSync('public/favicon.svg', svg);
 console.log('Updated public/favicon.svg with Khansa logo');
+
