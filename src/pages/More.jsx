@@ -1,13 +1,10 @@
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { paiseToRupees } from '../lib/tax.js';
 
 export default function More() {
-  const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Backup modal state
   const [backupModalOpen, setBackupModalOpen] = useState(false);
@@ -67,18 +64,6 @@ export default function More() {
       ),
     },
   ];
-
-  const handleSignOut = async () => {
-    setIsSigningOut(true);
-    try {
-      await signOut();
-      navigate('/login', { replace: true });
-    } catch (err) {
-      console.error('Sign out error:', err);
-    } finally {
-      setIsSigningOut(false);
-    }
-  };
 
   // Perform Complete Data Export (Excel / JSON)
   const handleExportData = async (format = 'excel') => {
@@ -191,17 +176,17 @@ export default function More() {
 
   return (
     <div className="space-y-6">
-      {/* Account Info Box */}
+      {/* Business Info Box */}
       <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 shadow-sm">
         <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-          Signed In Account
+          Business Profile
         </p>
-        <p className="text-lg font-black text-slate-900 mt-1 break-all">
-          {user?.email || 'Authenticated User'}
+        <p className="text-lg font-black text-slate-900 mt-1">
+          Khansa Enterprises
         </p>
         <p className="text-xs font-semibold text-emerald-700 mt-1 flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block"></span>
-          Session remains active on this device
+          GST Intra-State Invoicing System
         </p>
       </div>
 
@@ -310,32 +295,6 @@ export default function More() {
           </div>
         </div>
       )}
-
-      {/* Sign Out Section */}
-      <div className="pt-2">
-        <button
-          onClick={handleSignOut}
-          disabled={isSigningOut}
-          className="w-full min-h-[52px] px-6 py-3.5 rounded-2xl border-2 border-red-500 bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-900 font-bold text-lg flex items-center justify-center space-x-2.5 transition cursor-pointer"
-        >
-          {isSigningOut ? (
-            <span className="flex items-center space-x-2">
-              <span className="w-5 h-5 border-2 border-red-800/40 border-t-red-800 rounded-full animate-spin"></span>
-              <span>Signing Out...</span>
-            </span>
-          ) : (
-            <>
-              <svg className="w-6 h-6 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              <span>Sign Out</span>
-            </>
-          )}
-        </button>
-        <p className="text-xs text-center text-slate-500 mt-2 font-medium">
-          Only sign out if you want to switch accounts.
-        </p>
-      </div>
     </div>
   );
 }

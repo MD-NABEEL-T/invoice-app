@@ -1,9 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
-import ProtectedRoute from './components/ProtectedRoute.jsx';
 import AppShell from './components/AppShell.jsx';
-import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import NewBill from './pages/NewBill.jsx';
 import Bills from './pages/Bills.jsx';
@@ -27,18 +25,8 @@ export default function App() {
       <BrowserRouter>
         <PwaUpdateBanner />
         <Routes>
-          {/* Public Login Route */}
-          <Route path="/login" element={<Login />} />
-
-          {/* Protected App Routes inside AppShell */}
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <AppShell />
-              </ProtectedRoute>
-            }
-          >
+          {/* Main App Routes inside AppShell - completely open without login */}
+          <Route path="/" element={<AppShell />}>
             <Route index element={<Home />} />
             <Route path="new" element={<NewBill />} />
             <Route path="bills" element={<Bills />} />
@@ -63,6 +51,9 @@ export default function App() {
               }
             />
           )}
+
+          {/* Legacy /login redirect to Home */}
+          <Route path="/login" element={<Navigate to="/" replace />} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

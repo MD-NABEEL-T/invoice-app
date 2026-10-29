@@ -129,4 +129,11 @@ It is also a resume project for me, so I want to understand every line.
   3. Phase 7b: HSN lookup guide modal, 1-click verify action in Items catalog, and quick HSN preset chips in bill creation.
   4. Phase 8: Month-End Reports with FY and Month filters, KPI cards, Buyer statement (HARDCOPY), GST Sales Register, HSN Summary, and multi-sheet Excel (.xlsx) export.
   5. Full Database Backup & Export (JSON & multi-sheet Excel) in More menu.
-  6. Email & Google Apps Script webhook integration for khansaenterprises19@gmail.com in Settings.
+  6. Email & Google Apps Script webhook integration for khansaenterprises19@gmail.com in Settings.
+
+
+ok fine now we have some huge modification and understanding so after finishing the work only give me a short summary alright 
+first thing is remove the login [COMPLETED]
+then i want to deploy in vercel not netlify because that powered by netlify comes in the website so that first
+responsiveness
+

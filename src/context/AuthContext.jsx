@@ -2,11 +2,9 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase.js';
 
 const AuthContext = createContext({
-  user: null,
   session: null,
-  loading: true,
-  signIn: async () => {},
-  signOut: async () => {},
+  user: null,
+  loading: false,
 });
 
 export function AuthProvider({ children }) {
@@ -17,24 +15,46 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true;
 
-    // Check active session
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
-      if (mounted) {
-        setSession(initialSession);
-        setUser(initialSession?.user ?? null);
-        setLoading(false);
-      }
-    }).catch((err) => {
-      console.error('Error fetching auth session:', err);
-      if (mounted) setLoading(false);
-    });
+    async function initAuth() {
+      try {
+        const { data: { session: existingSession } } = await supabase.auth.getSession();
+        if (existingSession) {
+          if (mounted) {
+            setSession(existingSession);
+            setUser(existingSession.user);
+            setLoading(false);
+          }
+          return;
+        }
 
-    // Listen for auth state changes (e.g. login, token refresh, logout)
+        // Transparent background authentication: sign in silently using app credentials
+        const email = import.meta.env.VITE_APP_AUTH_EMAIL || 'test@example.com';
+        const password = import.meta.env.VITE_APP_AUTH_PASSWORD || 'Test@12345';
+
+        if (email && password) {
+          const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+          if (!error && data?.session) {
+            if (mounted) {
+              setSession(data.session);
+              setUser(data.user);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Silent auto-auth initialization error:', err);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    initAuth();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
       if (mounted) {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
-        setLoading(false);
       }
     });
 
@@ -44,25 +64,27 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  const signIn = async (email, password) => {
-    return supabase.auth.signInWithPassword({ email, password });
-  };
-
-  const signOut = async () => {
-    return supabase.auth.signOut();
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white font-sans">
+        <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center font-black text-2xl text-white shadow-lg mb-4">
+          K
+        </div>
+        <div className="w-8 h-8 border-3 border-blue-400/30 border-t-blue-500 rounded-full animate-spin"></div>
+        <p className="mt-4 text-sm font-bold tracking-wide uppercase text-slate-300">
+          Khansa Enterprises
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <AuthContext.Provider value={{ session, user, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ session, user, loading: false }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  return useContext(AuthContext);
 }
