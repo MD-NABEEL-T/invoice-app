@@ -745,3 +745,4 @@ GRANT EXECUTE ON FUNCTION public.cancel_invoice(uuid) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.set_starting_number(text, int) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_numbering_status(text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.change_starting_number(text, int) TO anon, authenticated;
+

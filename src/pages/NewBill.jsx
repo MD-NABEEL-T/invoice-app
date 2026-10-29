@@ -70,6 +70,7 @@ export default function NewBill() {
   // ---------------------------------------------------------------------------
   const [itemsCatalog, setItemsCatalog] = useState([]);
   const [itemSearchText, setItemSearchText] = useState('');
+  const [selectedSearchIdx, setSelectedSearchIdx] = useState(0);
   const [lines, setLines] = useState([]);
 
   // Line removal confirmation
@@ -567,6 +568,27 @@ export default function NewBill() {
       )
       .slice(0, 10);
   }, [itemsCatalog, itemSearchText]);
+
+  // Keyboard navigation for search suggestions
+  const handleSearchKeyDown = (e) => {
+    if (searchResults.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedSearchIdx((prev) => (prev + 1) % searchResults.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedSearchIdx((prev) => (prev - 1 + searchResults.length) % searchResults.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const itemToAdd = searchResults[selectedSearchIdx] || searchResults[0];
+      if (itemToAdd) {
+        handleAddItemFromCatalog(itemToAdd);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setItemSearchText('');
+    }
+  };
 
   // Update line field
   const handleUpdateLine = (index, field, value) => {
@@ -1224,42 +1246,93 @@ export default function NewBill() {
           </button>
         </div>
 
-        {/* Item Search Box */}
+        {/* Item Search Box with Autocomplete Suggestions */}
         <div className="relative">
-          <label className="block text-base font-bold text-slate-900 mb-1">
-            Search Item to Add
-          </label>
-          <input
-            type="text"
-            value={itemSearchText}
-            onChange={(e) => setItemSearchText(e.target.value)}
-            placeholder="Type item description or HSN to add..."
-            className="w-full min-h-[50px] px-4 py-3 rounded-2xl border-2 border-slate-400 bg-white text-slate-900 text-base font-semibold"
-          />
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-base font-bold text-slate-900">
+              Search Item to Add
+            </label>
+            <span className="text-xs font-semibold text-slate-500">
+              {itemsCatalog.length} catalog items loaded
+            </span>
+          </div>
 
-          {/* Search Results Dropdown */}
-          {searchResults.length > 0 && (
-            <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-white border-2 border-slate-900 rounded-2xl shadow-2xl max-h-64 overflow-y-auto divide-y divide-slate-100">
-              {searchResults.map((it) => (
-                <button
-                  type="button"
-                  key={it.id}
-                  onClick={() => handleAddItemFromCatalog(it)}
-                  className="w-full text-left p-3.5 hover:bg-blue-50 active:bg-blue-100 flex items-center justify-between transition"
-                >
-                  <div>
-                    <p className="font-bold text-slate-900 text-base leading-snug">
-                      {it.description}
-                    </p>
-                    <p className="text-xs font-semibold text-slate-500">
-                      HSN: {it.hsn || 'Needs checking'} &bull; GST: {it.gst_percent !== null ? `${it.gst_percent}%` : 'Needs checking'} &bull; Unit: {it.unit || 'PCS'}
-                    </p>
-                  </div>
-                  <span className="text-sm font-black text-blue-700 bg-blue-100 px-2.5 py-1 rounded-xl shrink-0 ml-2">
-                    + Add
-                  </span>
-                </button>
-              ))}
+          <div className="relative">
+            <input
+              type="text"
+              value={itemSearchText}
+              onChange={(e) => {
+                setItemSearchText(e.target.value);
+                setSelectedSearchIdx(0);
+              }}
+              onKeyDown={handleSearchKeyDown}
+              placeholder="Search by item name (e.g. Surf, Soap, Box) or HSN..."
+              className="w-full min-h-[50px] pl-4 pr-10 py-3 rounded-2xl border-2 border-slate-400 bg-white text-slate-900 text-base font-semibold focus:border-blue-600 focus:outline-none"
+            />
+            {itemSearchText && (
+              <button
+                type="button"
+                onClick={() => setItemSearchText('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold flex items-center justify-center text-sm"
+              >
+                &times;
+              </button>
+            )}
+          </div>
+
+          {/* Search Results Dropdown with Autocomplete Suggestions */}
+          {itemSearchText.trim().length > 0 && (
+            <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-white border-2 border-slate-900 rounded-2xl shadow-2xl max-h-72 overflow-y-auto divide-y divide-slate-100">
+              {searchResults.length > 0 ? (
+                searchResults.map((it, idx) => {
+                  const isSelected = idx === selectedSearchIdx;
+                  return (
+                    <button
+                      type="button"
+                      key={it.id}
+                      onClick={() => handleAddItemFromCatalog(it)}
+                      onMouseEnter={() => setSelectedSearchIdx(idx)}
+                      className={`w-full text-left p-3.5 flex items-center justify-between transition cursor-pointer ${
+                        isSelected ? 'bg-blue-100/90 text-blue-950 font-bold' : 'hover:bg-blue-50'
+                      }`}
+                    >
+                      <div>
+                        <p className="font-black text-slate-900 text-base leading-snug">
+                          {it.description}
+                        </p>
+                        <p className="text-xs font-semibold text-slate-600 mt-0.5">
+                          HSN: <span className="font-bold text-slate-900">{it.hsn || 'Needs checking'}</span> &bull;{' '}
+                          GST: <span className="font-bold text-slate-900">{it.gst_percent !== null ? `${it.gst_percent}%` : 'Needs checking'}</span> &bull;{' '}
+                          Unit: <span className="font-bold text-slate-900">{it.unit || 'PCS'}</span>
+                          {it.default_rate_paise ? (
+                            <> &bull; Usual: <span className="font-bold text-emerald-700">₹{paiseToRupees(it.default_rate_paise)}</span></>
+                          ) : null}
+                        </p>
+                      </div>
+                      <span className="text-xs font-black text-blue-700 bg-blue-100 px-3 py-1.5 rounded-xl shrink-0 ml-2 border border-blue-300">
+                        + Add
+                      </span>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="p-4 text-center space-y-2">
+                  <p className="text-sm font-bold text-slate-700">
+                    No catalog items matching &ldquo;{itemSearchText}&rdquo;
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewItemForm((prev) => ({ ...prev, description: itemSearchText.trim() }));
+                      setItemSearchText('');
+                      setNewItemModalOpen(true);
+                    }}
+                    className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 cursor-pointer"
+                  >
+                    <span>+ Add &ldquo;{itemSearchText.trim()}&rdquo; as New Item</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1292,13 +1365,34 @@ export default function NewBill() {
                 >
                   {/* Card Title & Remove */}
                   <div className="flex items-start justify-between gap-2">
-                    <div>
+                    <div className="flex-1 mr-2">
                       <span className="text-xs font-black text-slate-400 block uppercase">
                         Line #{idx + 1}
                       </span>
-                      <h4 className="text-lg font-black text-slate-900 leading-snug">
-                        {line.description}
-                      </h4>
+                      <input
+                        type="text"
+                        list="catalog-item-datalist"
+                        value={line.description}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          handleUpdateLine(idx, 'description', val);
+                          const matched = itemsCatalog.find(
+                            (c) => c.description.toLowerCase() === val.trim().toLowerCase()
+                          );
+                          if (matched) {
+                            if (matched.hsn) handleUpdateLine(idx, 'hsn', matched.hsn);
+                            if (matched.gst_percent !== null && matched.gst_percent !== undefined) {
+                              handleUpdateLine(idx, 'gst_percent', String(matched.gst_percent));
+                            }
+                            if (matched.unit) handleUpdateLine(idx, 'unit', matched.unit);
+                            if (matched.default_rate_paise) {
+                              handleUpdateLine(idx, 'rate', paiseToRupees(matched.default_rate_paise));
+                            }
+                          }
+                        }}
+                        placeholder="Item Description"
+                        className="w-full text-base sm:text-lg font-black text-slate-900 bg-transparent border-b-2 border-slate-300 focus:border-blue-600 focus:outline-none py-0.5"
+                      />
                     </div>
                     <button
                       type="button"
@@ -1424,6 +1518,15 @@ export default function NewBill() {
             })}
           </div>
         )}
+
+        {/* Datalist for inline line description auto-completion */}
+        <datalist id="catalog-item-datalist">
+          {itemsCatalog.map((it) => (
+            <option key={it.id} value={it.description}>
+              {it.hsn ? `HSN: ${it.hsn}` : ''}
+            </option>
+          ))}
+        </datalist>
       </div>
 
       {/* SECTION 3: LIVE TOTALS (RATE-GROUP BREAKDOWN & GRAND TOTAL) */}
