@@ -282,20 +282,20 @@ export default function BillView() {
   const labelCopiesEnabled = isLabelCopiesEnabled();
 
   return (
-    <div className="space-y-6 pb-28 sm:pb-12">
-      {/* Top Navigation & Primary Action Row */}
+    <div className="space-y-5 pb-28 sm:pb-12 max-w-full overflow-x-hidden">
+      {/* Top Bar: Navigation, View Mode Toggle, and Primary Print/Share Button */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center justify-between w-full sm:w-auto gap-2">
           <Link
             to="/bills"
-            className="inline-flex items-center space-x-1.5 text-sm font-bold text-slate-700 bg-white border border-slate-300 px-3.5 py-2 rounded-xl hover:bg-slate-50 transition min-h-[44px]"
+            className="inline-flex items-center space-x-1.5 text-sm font-bold text-slate-700 bg-white border border-slate-300 px-3.5 py-2 rounded-xl hover:bg-slate-50 transition min-h-[44px] shrink-0"
           >
             <span>&larr;</span>
-            <span>Bills Register</span>
+            <span>Bills</span>
           </Link>
 
           {/* View Mode Toggle Button */}
-          <div className="inline-flex p-1 bg-slate-200 rounded-xl border border-slate-300">
+          <div className="inline-flex p-1 bg-slate-200 rounded-xl border border-slate-300 shrink-0">
             <button
               type="button"
               onClick={() => setViewMode('cards')}
@@ -305,7 +305,7 @@ export default function BillView() {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Summary View
+              Summary
             </button>
             <button
               type="button"
@@ -316,81 +316,84 @@ export default function BillView() {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              A4 Print Preview
+              A4 Preview
             </button>
           </div>
-
-          {/* Copy as New Bill Button (Phase 7) */}
-          <Link
-            to={`/new?copyFrom=${id}`}
-            className="inline-flex items-center space-x-1.5 text-sm font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-3.5 py-2 rounded-xl hover:bg-emerald-100 transition min-h-[44px]"
-            title="Duplicate items and details into a new bill"
-          >
-            <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-            <span>Copy as New</span>
-          </Link>
-
-          {/* Edit Bill Button (disabled if cancelled) */}
-          {!isCancelled && (
-            <Link
-              to={`/bills/${id}/edit`}
-              className="inline-flex items-center space-x-1.5 text-sm font-bold text-blue-700 bg-blue-50 border border-blue-300 px-3.5 py-2 rounded-xl hover:bg-blue-100 transition min-h-[44px]"
-            >
-              <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              <span>Edit</span>
-            </Link>
-          )}
-
-          {/* Cancel Bill Button (Phase 7) */}
-          {!isCancelled && (
-            <button
-              type="button"
-              onClick={() => {
-                setCancelError('');
-                setShowCancelModal(true);
-              }}
-              className="inline-flex items-center space-x-1.5 text-sm font-bold text-amber-800 bg-amber-50 border border-amber-300 px-3.5 py-2 rounded-xl hover:bg-amber-100 transition min-h-[44px] cursor-pointer"
-            >
-              <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-              </svg>
-              <span>Cancel</span>
-            </button>
-          )}
-
-          {/* Delete Bill Button */}
-          <button
-            type="button"
-            onClick={() => {
-              setDeleteError('');
-              setShowDeleteModal(true);
-            }}
-            className="inline-flex items-center space-x-1.5 text-sm font-bold text-red-700 bg-red-50 border border-red-300 px-3.5 py-2 rounded-xl hover:bg-red-100 transition min-h-[44px] cursor-pointer"
-          >
-            <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-            <span>Delete</span>
-          </button>
         </div>
 
-        {/* Big Print / Share Primary Button (Desktop/Tablet) */}
+        {/* Big Print / Share Primary Button - ALWAYS VISIBLE on mobile, tablet & desktop */}
         <button
           type="button"
           onClick={() => {
             setPdfMessage('');
             setShowPrintModal(true);
           }}
-          className="hidden sm:inline-flex min-h-[50px] px-6 py-2.5 rounded-2xl bg-blue-700 text-white font-black text-base hover:bg-blue-800 shadow-md items-center justify-center space-x-2 active:scale-[0.98] transition cursor-pointer"
+          className="w-full sm:w-auto min-h-[48px] sm:min-h-[50px] px-5 sm:px-6 py-2.5 rounded-2xl bg-blue-700 text-white font-black text-base hover:bg-blue-800 active:bg-blue-900 shadow-md flex items-center justify-center space-x-2 active:scale-[0.98] transition cursor-pointer"
         >
           <svg className="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
           </svg>
           <span>Print / Share Bill</span>
+        </button>
+      </div>
+
+      {/* Secondary Actions Row: Cleanly scrollable horizontally without expanding page width */}
+      <div className="no-print overflow-x-auto pb-1 -mx-1 px-1 flex items-center gap-2 max-w-full">
+        {/* Copy as New Bill Button */}
+        <Link
+          to={`/new?copyFrom=${id}`}
+          className="inline-flex items-center space-x-1.5 text-xs sm:text-sm font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-3 py-2 rounded-xl hover:bg-emerald-100 transition min-h-[40px] shrink-0 whitespace-nowrap"
+          title="Duplicate items and details into a new bill"
+        >
+          <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+          <span>Copy as New</span>
+        </Link>
+
+        {/* Edit Bill Button */}
+        {!isCancelled && (
+          <Link
+            to={`/bills/${id}/edit`}
+            className="inline-flex items-center space-x-1.5 text-xs sm:text-sm font-bold text-blue-700 bg-blue-50 border border-blue-300 px-3 py-2 rounded-xl hover:bg-blue-100 transition min-h-[40px] shrink-0 whitespace-nowrap"
+          >
+            <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <span>Edit</span>
+          </Link>
+        )}
+
+        {/* Cancel Bill Button */}
+        {!isCancelled && (
+          <button
+            type="button"
+            onClick={() => {
+              setCancelError('');
+              setShowCancelModal(true);
+            }}
+            className="inline-flex items-center space-x-1.5 text-xs sm:text-sm font-bold text-amber-800 bg-amber-50 border border-amber-300 px-3 py-2 rounded-xl hover:bg-amber-100 transition min-h-[40px] shrink-0 whitespace-nowrap cursor-pointer"
+          >
+            <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+            </svg>
+            <span>Cancel</span>
+          </button>
+        )}
+
+        {/* Delete Bill Button */}
+        <button
+          type="button"
+          onClick={() => {
+            setDeleteError('');
+            setShowDeleteModal(true);
+          }}
+          className="inline-flex items-center space-x-1.5 text-xs sm:text-sm font-bold text-red-700 bg-red-50 border border-red-300 px-3 py-2 rounded-xl hover:bg-red-100 transition min-h-[40px] shrink-0 whitespace-nowrap cursor-pointer"
+        >
+          <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          <span>Delete</span>
         </button>
       </div>
 
@@ -666,8 +669,8 @@ export default function BillView() {
         </div>
       )}
 
-      {/* Sticky Mobile Print/Share Button (pinned to viewport bottom on phones) */}
-      <div className="fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur-md border-t border-slate-300 shadow-xl sm:hidden z-30 no-print flex items-center justify-between gap-3">
+      {/* Sticky Mobile Print/Share Button (docked right above the bottom navigation bar on phones) */}
+      <div className="fixed bottom-20 left-0 right-0 p-3 bg-white/95 backdrop-blur-md border-t border-slate-300 shadow-xl sm:hidden z-25 no-print flex items-center justify-between gap-3">
         <button
           type="button"
           onClick={() => {
@@ -792,6 +795,13 @@ export default function BillView() {
                   </svg>
                   <span>Download PDF</span>
                 </button>
+              </div>
+
+              {/* Canon LBP 2900 & Mobile Printer Tip */}
+              <div className="pt-1 text-center">
+                <p className="text-[11px] text-slate-500 font-medium leading-tight">
+                  🖨️ <strong>Canon LBP 2900 / Phone Tip:</strong> Use <strong>Share PDF</strong> &rarr; <em>NokoPrint</em> (via USB OTG or Wi-Fi) on phone, or <strong>Print</strong> directly from PC.
+                </p>
               </div>
             </div>
           </div>
