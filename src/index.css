@@ -83,7 +83,12 @@ body {
     width: 210mm !important;
     max-width: 210mm !important;
     min-width: 210mm !important;
+    height: 297mm !important;
     min-height: 297mm !important;
+    max-height: 297mm !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
     box-shadow: none !important;
     page-break-after: always !important;
     break-after: page !important;

@@ -43,13 +43,20 @@ export async function generateInvoicePdfBlob(pageElements, { scale = 2, jpegQual
       logging: false,
       backgroundColor: '#ffffff',
       width: 794,
+      height: 1123,
       windowWidth: 794,
+      windowHeight: 1123,
       scrollX: 0,
       scrollY: 0,
-      x: 0,
-      y: 0,
       onclone: async (clonedDoc, clonedEl) => {
-        // 1. Force clonedDoc root and body to exact 794px A4 width with zero scroll/margin
+        // 1. Hide all navigation bars, headers, floating bars, and dialogs in the cloned document
+        const nonPrintables = clonedDoc.querySelectorAll('nav, header, footer, .no-print, .fixed, button');
+        nonPrintables.forEach((el) => {
+          el.style.display = 'none';
+          el.style.visibility = 'hidden';
+        });
+
+        // 2. Force clonedDoc root and body to exact 794px x 1123px A4 dimensions
         if (clonedDoc.documentElement) {
           clonedDoc.documentElement.style.width = '794px';
           clonedDoc.documentElement.style.minWidth = '794px';
@@ -65,18 +72,21 @@ export async function generateInvoicePdfBlob(pageElements, { scale = 2, jpegQual
           clonedDoc.body.style.overflow = 'visible';
         }
 
-        // 2. Unconstrain and reset clonedEl explicitly to 794px A4 dimensions
+        // 3. Unconstrain and reset clonedEl explicitly to exact 794px x 1123px A4 dimensions
         if (clonedEl && clonedEl.style) {
           clonedEl.style.width = '794px';
           clonedEl.style.minWidth = '794px';
           clonedEl.style.maxWidth = '794px';
+          clonedEl.style.height = '1123px';
+          clonedEl.style.minHeight = '1123px';
+          clonedEl.style.maxHeight = '1123px';
           clonedEl.style.transform = 'none';
           clonedEl.style.margin = '0';
-          clonedEl.style.position = 'static';
+          clonedEl.style.position = 'relative';
           clonedEl.style.opacity = '1';
         }
 
-        // 3. Reset all ancestor containers up to body
+        // 4. Reset all ancestor containers up to body
         let cur = clonedEl ? clonedEl.parentElement : null;
         while (cur && cur !== clonedDoc.body) {
           if (cur.style) {
@@ -95,7 +105,7 @@ export async function generateInvoicePdfBlob(pageElements, { scale = 2, jpegQual
           cur = cur.parentElement;
         }
 
-        // 4. Ensure all images inside clonedDoc (including logo) are fully decoded
+        // 5. Ensure all images inside clonedDoc (including logo) are fully decoded
         try {
           const imgs = Array.from(clonedDoc.querySelectorAll('img'));
           await Promise.all(
