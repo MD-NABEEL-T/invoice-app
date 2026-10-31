@@ -137,3 +137,6 @@ first thing is remove the login [COMPLETED]
 then i want to deploy in vercel not netlify because that powered by netlify comes in the website so that first
 responsiveness
 
+
+in the bill the hsn and taxable value i cant see in pdf
+alright and the thing is after each bill is saved could the pdf be mailed instead of just the contents and here is the existing code you gave me and which i deployed in appscript code

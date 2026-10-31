@@ -1,6 +1,5 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext.jsx';
 import AppShell from './components/AppShell.jsx';
 import Home from './pages/Home.jsx';
 import NewBill from './pages/NewBill.jsx';
@@ -21,44 +20,42 @@ const DevPrintSample = import.meta.env.DEV
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <PwaUpdateBanner />
-        <Routes>
-          {/* Main App Routes inside AppShell - completely open without login */}
-          <Route path="/" element={<AppShell />}>
-            <Route index element={<Home />} />
-            <Route path="new" element={<NewBill />} />
-            <Route path="bills" element={<Bills />} />
-            <Route path="bills/:id" element={<BillView />} />
-            <Route path="bills/:id/edit" element={<NewBill />} />
-            <Route path="reports" element={<Reports />} />
-            <Route path="more" element={<More />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="buyers" element={<Buyers />} />
-            <Route path="items" element={<Items />} />
-            <Route path="items/import" element={<ItemImport />} />
-          </Route>
+    <BrowserRouter>
+      <PwaUpdateBanner />
+      <Routes>
+        {/* Main App Routes inside AppShell - completely open without login */}
+        <Route path="/" element={<AppShell />}>
+          <Route index element={<Home />} />
+          <Route path="new" element={<NewBill />} />
+          <Route path="bills" element={<Bills />} />
+          <Route path="bills/:id" element={<BillView />} />
+          <Route path="bills/:id/edit" element={<NewBill />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="more" element={<More />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="buyers" element={<Buyers />} />
+          <Route path="items" element={<Items />} />
+          <Route path="items/import" element={<ItemImport />} />
+        </Route>
 
-          {/* Dev-only route for A4 invoice print/PDF test fixtures */}
-          {import.meta.env.DEV && DevPrintSample && (
-            <Route
-              path="/dev/print-sample"
-              element={
-                <React.Suspense fallback={<div className="p-8 text-center font-bold">Loading print fixtures...</div>}>
-                  <DevPrintSample />
-                </React.Suspense>
-              }
-            />
-          )}
+        {/* Dev-only route for A4 invoice print/PDF test fixtures */}
+        {import.meta.env.DEV && DevPrintSample && (
+          <Route
+            path="/dev/print-sample"
+            element={
+              <React.Suspense fallback={<div className="p-8 text-center font-bold">Loading print fixtures...</div>}>
+                <DevPrintSample />
+              </React.Suspense>
+            }
+          />
+        )}
 
-          {/* Legacy /login redirect to Home */}
-          <Route path="/login" element={<Navigate to="/" replace />} />
+        {/* Legacy /login redirect to Home */}
+        <Route path="/login" element={<Navigate to="/" replace />} />
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
