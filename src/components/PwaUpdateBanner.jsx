@@ -37,7 +37,14 @@ export default function PwaUpdateBanner() {
       <div className="flex items-center space-x-2">
         <button
           type="button"
-          onClick={() => updateServiceWorker(true)}
+          onClick={async () => {
+            try {
+              await updateServiceWorker(true);
+            } catch (err) {
+              console.warn('SW update error:', err);
+            }
+            window.location.reload();
+          }}
           className="min-h-[40px] px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-sm transition cursor-pointer"
         >
           Update
