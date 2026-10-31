@@ -140,3 +140,7 @@ responsiveness
 
 in the bill the hsn and taxable value i cant see in pdf
 alright and the thing is after each bill is saved could the pdf be mailed instead of just the contents and here is the existing code you gave me and which i deployed in appscript code
+what is this update to latest version and when i click it doesnt work i guess and lastly what i want is that before months and past years data' are still in excel sheet is there anyway just to upload it likewise and if everything's done then shall we delete the mock data and i tell them to start using it for real time ?
+
+
+check this modifications and inform fazil bhaiya 

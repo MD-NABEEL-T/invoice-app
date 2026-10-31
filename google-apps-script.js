@@ -1,32 +1,45 @@
 /**
  * =============================================================================
- * Khansa Enterprises - Google Apps Script Invoice Webhook
+ * Khansa Enterprises - Google Apps Script Invoice Webhook with PDF Attachment
  * =============================================================================
  *
- * HOW TO DEPLOY:
- * 1. Open Google Sheets (or script.google.com).
- * 2. Click "Extensions" > "Apps Script".
- * 3. Replace all code in Code.gs with this file.
- * 4. Set DEFAULT_RECIPIENT_EMAIL below to your desired email address.
- * 5. Click "Deploy" > "New deployment".
- * 6. Select type: "Web app".
- * 7. Set:
- *    - Execute as: "Me"
- *    - Who has access: "Anyone"  <-- CRITICAL!
- * 8. Click "Deploy", authorize permissions, and copy the Web App URL:
- *    (e.g., https://script.google.com/macros/s/.../exec)
- * 9. Paste that URL into Settings > Google Apps Script Webhook in your invoice app.
+ * Automatically generates a professional A4 GST Tax Invoice PDF and emails it
+ * directly to the owners whenever a bill is saved or edited.
+ *
+ * HOW TO UPDATE YOUR DEPLOYMENT:
+ * 1. Open your Google Sheet (Extensions > Apps Script) or https://script.google.com
+ * 2. Select all existing code in Code.gs and replace it with this file.
+ * 3. Click "Save" (disk icon or Ctrl+S).
+ * 4. Click "Deploy" > "Manage deployments".
+ * 5. Click the pencil icon (Edit) on your Active deployment.
+ * 6. Under "Version", select "New version".
+ * 7. Click "Deploy" and "Done".
+ *
+ * (You can also test it immediately inside Apps Script by selecting
+ *  'testSendSampleInvoiceWithPdf' from the function dropdown and clicking 'Run'!)
  * =============================================================================
  */
 
-// Fallback recipient email (can also be passed dynamically in the webhook payload)
-const DEFAULT_RECIPIENT_EMAIL = 'khansaenterprises19@gmail.com';
+// Both emails will receive the email notification and attached PDF
+const DEFAULT_RECIPIENT_EMAIL = 'khansaenterprises19@gmail.com,mohammedfazfaz@gmail.com';
+
+const FIRM = {
+  name: 'KHANSA ENTERPRISES',
+  address: '1/19, MOSQUE STREET, MELVISHARAM - 632 509,\nRANIPET DIST., TAMIL NADU',
+  gstin: '33AGXPF4947Q1ZH',
+  state: 'Tamil Nadu',
+  stateCode: '33',
+  bankName: 'INDIAN OVERSEAS BANK',
+  branch: 'MELVISHARAM',
+  accountNo: '005402000001850',
+  ifsc: 'IOBA0000054',
+};
 
 function doGet(e) {
   return ContentService.createTextOutput(
     JSON.stringify({
       status: 'active',
-      app: 'Khansa Enterprises GST Invoicing Webhook',
+      app: 'Khansa Enterprises GST Invoicing Webhook with PDF',
       timestamp: new Date().toISOString(),
     })
   ).setMimeType(ContentService.MimeType.JSON);
@@ -41,195 +54,77 @@ function doPost(e) {
     }
 
     const data = JSON.parse(e.postData.contents);
-    const recipient = data.email_to || DEFAULT_RECIPIENT_EMAIL;
     const action = data.action || 'Bill Saved';
     const invoiceNo = data.invoice_no || 'Draft';
     const date = data.date || new Date().toISOString().slice(0, 10);
     const buyerName = data.buyer_name || 'KH EXPORT INDIA PVT LTD';
-    const buyerAddress = data.buyer_address || '';
-    const buyerOrderNo = data.buyer_order_no || '-';
-    const despatchedThrough = data.despatched_through || '-';
     const payableRupees = data.payable_rupees || (data.payable_paise ? (data.payable_paise / 100).toFixed(2) : '0.00');
-    const taxableRupees = data.taxable_rupees || (data.taxable_paise ? (data.taxable_paise / 100).toFixed(2) : '0.00');
-    const cgstRupees = data.cgst_rupees || (data.cgst_paise ? (data.cgst_paise / 100).toFixed(2) : '0.00');
-    const sgstRupees = data.sgst_rupees || (data.sgst_paise ? (data.sgst_paise / 100).toFixed(2) : '0.00');
-    const lines = data.lines || [];
 
-    // 1. Build Line Items HTML rows
-    let linesHtml = '';
-    if (lines.length > 0) {
-      linesHtml = lines.map(function(item, idx) {
-        const rateFormatted = item.rate || (item.rate_paise ? (item.rate_paise / 100).toFixed(2) : '-');
-        const amountFormatted = item.amount_rupees || (item.taxable_value_paise ? (item.taxable_value_paise / 100).toFixed(2) : '-');
-        return (
-          '<tr style="border-bottom: 1px solid #e2e8f0;">' +
-            '<td style="padding: 10px 8px; text-align: center; color: #64748b; font-weight: bold;">' + (idx + 1) + '</td>' +
-            '<td style="padding: 10px 8px; font-weight: bold; color: #0f172a;">' + (item.description || '-') + '</td>' +
-            '<td style="padding: 10px 8px; text-align: center; font-family: monospace; color: #475569;">' + (item.hsn || '-') + '</td>' +
-            '<td style="padding: 10px 8px; text-align: center; color: #334155;">' + (item.quantity || 1) + ' ' + (item.unit || 'PCS') + '</td>' +
-            '<td style="padding: 10px 8px; text-align: right; font-family: monospace; color: #334155;">₹' + rateFormatted + '</td>' +
-            '<td style="padding: 10px 8px; text-align: center; color: #334155;">' + (item.gst_percent ? item.gst_percent + '%' : '-') + '</td>' +
-            '<td style="padding: 10px 8px; text-align: right; font-family: monospace; font-weight: bold; color: #0f172a;">₹' + amountFormatted + '</td>' +
-          '</tr>'
-        );
-      }).join('');
-    } else {
-      linesHtml = '<tr><td colspan="7" style="padding: 12px; text-align: center; color: #64748b;">No line items detailed</td></tr>';
+    // 1. Determine recipients (ensure both configured emails receive it)
+    let recipient = DEFAULT_RECIPIENT_EMAIL;
+    if (data.email_to && data.email_to !== DEFAULT_RECIPIENT_EMAIL) {
+      const existing = DEFAULT_RECIPIENT_EMAIL.split(',').map(function(s) { return s.trim(); });
+      if (existing.indexOf(data.email_to.trim()) === -1) {
+        recipient = DEFAULT_RECIPIENT_EMAIL + ',' + data.email_to.trim();
+      }
     }
 
-    // 2. Build Full Responsive HTML Email
-    const emailSubject = '[' + action + '] Invoice #' + invoiceNo + ' (' + buyerName + ') - ₹' + payableRupees;
+    // 2. Build the A4 GST Tax Invoice PDF
+    let attachments = [];
+    if (data.pdf_base64) {
+      try {
+        const decoded = Utilities.base64Decode(data.pdf_base64);
+        const clientBlob = Utilities.newBlob(decoded, 'application/pdf', getPdfFilename(invoiceNo));
+        attachments.push(clientBlob);
+      } catch (decodeErr) {
+        console.warn('Client base64 decode failed, generating PDF from template:', decodeErr);
+      }
+    }
 
-    const emailHtml = (
-      '<!DOCTYPE html>' +
-      '<html>' +
-      '<head><meta charset="utf-8"></head>' +
-      '<body style="margin: 0; padding: 20px; font-family: Arial, -apple-system, BlinkMacSystemFont, sans-serif; background-color: #f1f5f9; color: #0f172a;">' +
-        '<div style="max-width: 680px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #cbd5e1;">' +
-          
-          // Header Banner
-          '<div style="background-color: #0f172a; padding: 24px; color: #ffffff;">' +
-            '<table width="100%" cellpadding="0" cellspacing="0" border="0">' +
-              '<tr>' +
-                '<td>' +
-                  '<div style="font-size: 11px; font-weight: bold; letter-spacing: 0.1em; color: #94a3b8; text-transform: uppercase;">GST Tax Invoice Copy</div>' +
-                  '<div style="font-size: 22px; font-weight: 900; margin-top: 4px; letter-spacing: 0.05em; text-transform: uppercase;">Khansa Enterprises</div>' +
-                  '<div style="font-size: 11px; color: #cbd5e1; margin-top: 2px;">Melvisharam-632509, Tamil Nadu &bull; GSTIN: 33AGXPF4947Q1ZH</div>' +
-                '</td>' +
-                '<td align="right" valign="top">' +
-                  '<span style="background-color: #2563eb; color: #ffffff; font-size: 12px; font-weight: 800; padding: 6px 14px; border-radius: 9999px; text-transform: uppercase; display: inline-block;">' +
-                    action +
-                  '</span>' +
-                '</td>' +
-              '</tr>' +
-            '</table>' +
-          '</div>' +
+    if (attachments.length === 0) {
+      const pdfHtml = buildInvoicePdfHtml(data);
+      const pdfBlob = Utilities.newBlob(pdfHtml, 'text/html', 'Invoice.html')
+        .getAs('application/pdf')
+        .setName(getPdfFilename(invoiceNo));
+      attachments.push(pdfBlob);
+    }
 
-          // Main Summary Grid
-          '<div style="padding: 24px;">' +
-            '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 24px;">' +
-              '<tr>' +
-                '<td style="padding: 14px 16px; border-right: 1px solid #e2e8f0; width: 50%;" valign="top">' +
-                  '<div style="font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase;">Invoice Number</div>' +
-                  '<div style="font-size: 18px; font-weight: 900; color: #0f172a; font-family: monospace; margin-top: 2px;">' + invoiceNo + '</div>' +
-                  '<div style="font-size: 11px; color: #64748b; margin-top: 6px;">Date: <b style="color: #0f172a;">' + date + '</b></div>' +
-                '</td>' +
-                '<td style="padding: 14px 16px; width: 50%;" valign="top">' +
-                  '<div style="font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase;">Buyer Order (PO)</div>' +
-                  '<div style="font-size: 16px; font-weight: 800; color: #0f172a; margin-top: 2px;">' + buyerOrderNo + '</div>' +
-                  '<div style="font-size: 11px; color: #64748b; margin-top: 6px;">Despatched Via: <b style="color: #0f172a;">' + despatchedThrough + '</b></div>' +
-                '</td>' +
-              '</tr>' +
-              '<tr style="border-top: 1px solid #e2e8f0;">' +
-                '<td colspan="2" style="padding: 14px 16px;">' +
-                  '<div style="font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase;">Billed &amp; Delivered To</div>' +
-                  '<div style="font-size: 14px; font-weight: 800; color: #0f172a; margin-top: 2px;">' + buyerName + '</div>' +
-                  (buyerAddress ? '<div style="font-size: 12px; color: #475569; margin-top: 4px; white-space: pre-line;">' + buyerAddress + '</div>' : '') +
-                '</td>' +
-              '</tr>' +
-            '</table>' +
+    // 3. Build Responsive HTML Notification Body
+    const emailHtml = buildNotificationEmailHtml(data, action);
+    const emailSubject = '[' + action + '] Invoice #' + invoiceNo + ' - ' + buyerName + ' (₹' + payableRupees + ')';
 
-            // Line Items Table
-            '<div style="font-size: 14px; font-weight: 900; color: #0f172a; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em;">' +
-              'Invoice Items (' + lines.length + ')' +
-            '</div>' +
-            '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 24px; font-size: 12px;">' +
-              '<thead style="background-color: #f1f5f9; border-bottom: 2px solid #cbd5e1;">' +
-                '<tr>' +
-                  '<th style="padding: 10px 8px; text-align: center; color: #475569; font-weight: 800;">#</th>' +
-                  '<th style="padding: 10px 8px; text-align: left; color: #475569; font-weight: 800;">Description</th>' +
-                  '<th style="padding: 10px 8px; text-align: center; color: #475569; font-weight: 800;">HSN</th>' +
-                  '<th style="padding: 10px 8px; text-align: center; color: #475569; font-weight: 800;">Qty</th>' +
-                  '<th style="padding: 10px 8px; text-align: right; color: #475569; font-weight: 800;">Rate</th>' +
-                  '<th style="padding: 10px 8px; text-align: center; color: #475569; font-weight: 800;">GST</th>' +
-                  '<th style="padding: 10px 8px; text-align: right; color: #475569; font-weight: 800;">Taxable (₹)</th>' +
-                '</tr>' +
-              '</thead>' +
-              '<tbody>' +
-                linesHtml +
-              '</tbody>' +
-            '</table>' +
-
-            // Grand Total Summary Box
-            '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f8fafc; border: 2px solid #0f172a; border-radius: 12px; padding: 16px;">' +
-              '<tr>' +
-                '<td style="font-size: 13px; color: #475569; padding: 4px 0;">Taxable Value:</td>' +
-                '<td align="right" style="font-size: 14px; font-family: monospace; font-weight: bold; color: #0f172a; padding: 4px 0;">₹' + taxableRupees + '</td>' +
-              '</tr>' +
-              '<tr>' +
-                '<td style="font-size: 13px; color: #475569; padding: 4px 0;">CGST (Central Tax):</td>' +
-                '<td align="right" style="font-size: 14px; font-family: monospace; font-weight: bold; color: #0f172a; padding: 4px 0;">₹' + cgstRupees + '</td>' +
-              '</tr>' +
-              '<tr>' +
-                '<td style="font-size: 13px; color: #475569; padding: 4px 0;">SGST (State Tax):</td>' +
-                '<td align="right" style="font-size: 14px; font-family: monospace; font-weight: bold; color: #0f172a; padding: 4px 0;">₹' + sgstRupees + '</td>' +
-              '</tr>' +
-              '<tr style="border-top: 2px solid #0f172a;">' +
-                '<td style="font-size: 16px; font-weight: 900; color: #0f172a; padding-top: 10px;">TOTAL PAYABLE:</td>' +
-                '<td align="right" style="font-size: 22px; font-family: monospace; font-weight: 900; color: #1e3a8a; padding-top: 10px;">₹' + payableRupees + '</td>' +
-              '</tr>' +
-            '</table>' +
-          '</div>' +
-
-          // Footer
-          '<div style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px; text-align: center; font-size: 11px; color: #64748b;">' +
-            'Automated invoice notification sent by Khansa Enterprises GST Invoicing System.<br>' +
-            'For questions or accounts reconciliation, contact Khansa Enterprises, Melvisharam.' +
-          '</div>' +
-
-        '</div>' +
-      '</body>' +
-      '</html>'
-    );
-
-    // Plain text alternative
-    const plainTextBody = (
-      action + ': Invoice #' + invoiceNo + '\n' +
-      'Date: ' + date + '\n' +
-      'Buyer: ' + buyerName + '\n' +
-      'PO Number: ' + buyerOrderNo + '\n' +
-      'Taxable Value: ₹' + taxableRupees + '\n' +
-      'CGST: ₹' + cgstRupees + '\n' +
-      'SGST: ₹' + sgstRupees + '\n' +
-      'Total Payable: ₹' + payableRupees + '\n\n' +
-      'This is an automated invoice dispatch from Khansa Enterprises.'
-    );
-
-    // 3. Send Email via Google Apps Script MailApp
+    // 4. Send Email via Google Apps Script MailApp with attached PDF
     MailApp.sendEmail({
       to: recipient,
       subject: emailSubject,
-      body: plainTextBody,
       htmlBody: emailHtml,
+      attachments: attachments,
       name: 'Khansa Enterprises Invoicing',
     });
 
-    // 4. Optionally append row to active Google Sheet (if bound to a Sheet)
+    // 5. Optionally record in Google Sheet if this script is linked to a Sheet
     try {
       const activeSheet = SpreadsheetApp.getActiveSpreadsheet();
       if (activeSheet) {
-        let sheet = activeSheet.getSheetByName('Invoices');
-        if (!sheet) {
-          sheet = activeSheet.getActiveSheet();
-        }
+        let sheet = activeSheet.getSheetByName('Invoices') || activeSheet.getActiveSheet();
         sheet.appendRow([
           new Date(),
           action,
           invoiceNo,
           date,
           buyerName,
-          buyerAddress,
-          buyerOrderNo,
-          despatchedThrough,
-          Number(taxableRupees),
-          Number(cgstRupees),
-          Number(sgstRupees),
+          data.buyer_address || '',
+          data.buyer_order_no || '',
+          data.despatched_through || '',
+          Number(data.taxable_rupees || 0),
+          Number(data.cgst_rupees || 0),
+          Number(data.sgst_rupees || 0),
           Number(payableRupees),
           recipient,
         ]);
       }
     } catch (sheetErr) {
-      console.warn('Google Sheet append skipped or not available:', sheetErr);
+      console.warn('Sheet append skipped or not available:', sheetErr);
     }
 
     return ContentService.createTextOutput(
@@ -237,6 +132,7 @@ function doPost(e) {
         status: 'success',
         invoice_no: invoiceNo,
         sent_to: recipient,
+        pdf_attached: true,
       })
     ).setMimeType(ContentService.MimeType.JSON);
 
@@ -250,3 +146,485 @@ function doPost(e) {
   }
 }
 
+/**
+ * Generate a clean safe filename for the PDF attachment
+ */
+function getPdfFilename(invoiceNo) {
+  const clean = (invoiceNo || 'Draft').replace(/[/\\?%*:|"<>]/g, '_');
+  return 'Invoice-' + clean + '.pdf';
+}
+
+/**
+ * Escape HTML to ensure safe rendering
+ */
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * Converts a number to Indian currency words
+ */
+function numberToWordsIndian(num) {
+  if (!num || isNaN(num)) return '';
+  const rounded = Math.round(Number(num));
+  if (rounded === 0) return 'Zero';
+
+  const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  function convert(n) {
+    if (n < 20) return a[n];
+    if (n < 100) return b[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + a[n % 10] : '');
+    if (n < 1000) return a[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' and ' + convert(n % 100) : '');
+    if (n < 100000) return convert(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + convert(n % 1000) : '');
+    if (n < 10000000) return convert(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + convert(n % 100000) : '');
+    return convert(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + convert(n % 10000000) : '');
+  }
+
+  return convert(rounded);
+}
+
+/**
+ * Build the exact A4 GST Tax Invoice HTML for conversion to PDF
+ */
+function buildInvoicePdfHtml(data) {
+  const invoiceNo = escapeHtml(data.invoice_no || 'Draft');
+  const date = escapeHtml(data.date || new Date().toISOString().slice(0, 10));
+  const buyerName = escapeHtml(data.buyer_name || 'KH EXPORT INDIA PVT LTD');
+  const buyerAddress = escapeHtml(data.buyer_address || '').replace(/\n/g, '<br>');
+  const buyerGstin = escapeHtml(data.buyer_gstin || '-');
+  const buyerState = escapeHtml(data.buyer_state || 'Tamil Nadu');
+  const buyerStateCode = escapeHtml(data.buyer_state_code || '33');
+  const buyerOrderNo = escapeHtml(data.buyer_order_no || '-');
+  const buyerOrderDate = escapeHtml(data.buyer_order_date || '-');
+  const despatchedThrough = escapeHtml(data.despatched_through || '-');
+  const destination = escapeHtml(data.destination || '-');
+  const termsOfDelivery = escapeHtml(data.terms_of_delivery || '-');
+
+  const payableRupees = data.payable_rupees || (data.payable_paise ? (data.payable_paise / 100).toFixed(2) : '0.00');
+  const taxableRupees = data.taxable_rupees || (data.taxable_paise ? (data.taxable_paise / 100).toFixed(2) : '0.00');
+  const cgstRupees = data.cgst_rupees || (data.cgst_paise ? (data.cgst_paise / 100).toFixed(2) : '0.00');
+  const sgstRupees = data.sgst_rupees || (data.sgst_paise ? (data.sgst_paise / 100).toFixed(2) : '0.00');
+  const amountWords = data.amount_in_words || ('INR ' + numberToWordsIndian(payableRupees) + ' Only');
+
+  const lines = data.lines || [];
+
+  // Group by HSN for HSN summary table
+  const hsnMap = {};
+  lines.forEach(function(l) {
+    const hsnKey = l.hsn || 'MISC';
+    const rateVal = parseFloat(l.gst_percent || 5);
+    const halfRate = (rateVal / 2).toFixed(1);
+    const taxable = parseFloat(l.amount_rupees || 0);
+
+    if (!hsnMap[hsnKey]) {
+      hsnMap[hsnKey] = {
+        hsn: hsnKey,
+        taxable: 0,
+        rateHalf: halfRate,
+        cgst: 0,
+        sgst: 0,
+      };
+    }
+    hsnMap[hsnKey].taxable += taxable;
+  });
+
+  let totalTaxableSummary = 0;
+  let totalCgstSummary = 0;
+  let totalSgstSummary = 0;
+
+  const hsnSummaryRows = Object.keys(hsnMap).map(function(k) {
+    const item = hsnMap[k];
+    const cgstAmt = (item.taxable * parseFloat(item.rateHalf) / 100);
+    const sgstAmt = cgstAmt;
+    totalTaxableSummary += item.taxable;
+    totalCgstSummary += cgstAmt;
+    totalSgstSummary += sgstAmt;
+
+    return (
+      '<tr>' +
+        '<td style="border:1px solid #000; padding:4px; text-align:center;">' + item.hsn + '</td>' +
+        '<td style="border:1px solid #000; padding:4px; text-align:right;">₹' + item.taxable.toFixed(2) + '</td>' +
+        '<td style="border:1px solid #000; padding:4px; text-align:center;">' + item.rateHalf + '%</td>' +
+        '<td style="border:1px solid #000; padding:4px; text-align:right;">₹' + cgstAmt.toFixed(2) + '</td>' +
+        '<td style="border:1px solid #000; padding:4px; text-align:center;">' + item.rateHalf + '%</td>' +
+        '<td style="border:1px solid #000; padding:4px; text-align:right;">₹' + sgstAmt.toFixed(2) + '</td>' +
+        '<td style="border:1px solid #000; padding:4px; text-align:right; font-weight:bold;">₹' + (cgstAmt + sgstAmt).toFixed(2) + '</td>' +
+      '</tr>'
+    );
+  }).join('');
+
+  // Items rows
+  let itemsRows = '';
+  lines.forEach(function(l, idx) {
+    const rateFormatted = l.rate || (l.rate_paise ? (l.rate_paise / 100).toFixed(2) : '-');
+    const amtFormatted = l.amount_rupees || (l.taxable_value_paise ? (l.taxable_value_paise / 100).toFixed(2) : '-');
+    itemsRows += (
+      '<tr>' +
+        '<td style="border-left:1px solid #000; border-right:1px solid #000; padding:4px 6px; text-align:center;">' + (idx + 1) + '</td>' +
+        '<td style="border-left:1px solid #000; border-right:1px solid #000; padding:4px 6px; font-weight:bold;">' + escapeHtml(l.description || '-') + '</td>' +
+        '<td style="border-left:1px solid #000; border-right:1px solid #000; padding:4px 6px; text-align:center;">' + escapeHtml(l.hsn || '-') + '</td>' +
+        '<td style="border-left:1px solid #000; border-right:1px solid #000; padding:4px 6px; text-align:center;">' + (l.quantity || 1) + ' ' + escapeHtml(l.unit || 'PCS') + '</td>' +
+        '<td style="border-left:1px solid #000; border-right:1px solid #000; padding:4px 6px; text-align:right;">' + rateFormatted + '</td>' +
+        '<td style="border-left:1px solid #000; border-right:1px solid #000; padding:4px 6px; text-align:center;">' + escapeHtml(l.unit || 'PCS') + '</td>' +
+        '<td style="border-left:1px solid #000; border-right:1px solid #000; padding:4px 6px; text-align:right; font-weight:bold;">₹' + amtFormatted + '</td>' +
+      '</tr>'
+    );
+  });
+
+  // Empty spacer rows to maintain A4 invoice grid proportions
+  const emptyCount = Math.max(0, 6 - lines.length);
+  for (let s = 0; s < emptyCount; s++) {
+    itemsRows += (
+      '<tr>' +
+        '<td style="border-left:1px solid #000; border-right:1px solid #000; padding:8px;">&nbsp;</td>' +
+        '<td style="border-left:1px solid #000; border-right:1px solid #000; padding:8px;">&nbsp;</td>' +
+        '<td style="border-left:1px solid #000; border-right:1px solid #000; padding:8px;">&nbsp;</td>' +
+        '<td style="border-left:1px solid #000; border-right:1px solid #000; padding:8px;">&nbsp;</td>' +
+        '<td style="border-left:1px solid #000; border-right:1px solid #000; padding:8px;">&nbsp;</td>' +
+        '<td style="border-left:1px solid #000; border-right:1px solid #000; padding:8px;">&nbsp;</td>' +
+        '<td style="border-left:1px solid #000; border-right:1px solid #000; padding:8px;">&nbsp;</td>' +
+      '</tr>'
+    );
+  }
+
+  // Complete HTML document for Google Apps Script HTML-to-PDF engine
+  return (
+    '<!DOCTYPE html>' +
+    '<html>' +
+    '<head>' +
+      '<meta charset="utf-8">' +
+      '<title>Invoice #' + invoiceNo + '</title>' +
+      '<style>' +
+        '@page { size: A4 portrait; margin: 8mm 8mm 8mm 8mm; }' +
+        'body { font-family: Arial, "Helvetica Neue", Helvetica, sans-serif; font-size: 10px; color: #000000; margin: 0; padding: 0; }' +
+        '.invoice-card { border: 2px solid #000000; width: 100%; box-sizing: border-box; }' +
+        'table { width: 100%; border-collapse: collapse; }' +
+      '</style>' +
+    '</head>' +
+    '<body>' +
+      '<div class="invoice-card">' +
+
+        // Top Header
+        '<div style="text-align:center; padding: 6px; border-bottom: 2px solid #000000;">' +
+          '<div style="font-size: 14px; font-weight: bold; letter-spacing: 1px;">TAX INVOICE</div>' +
+          '<div style="font-size: 9px; font-style: italic;">(Original for Recipient)</div>' +
+        '</div>' +
+
+        // Supplier and Invoice Details Table
+        '<table style="width: 100%; border-bottom: 2px solid #000000;">' +
+          '<tr>' +
+            // Supplier Box
+            '<td style="width: 52%; vertical-align: top; border-right: 1px solid #000000; padding: 6px;">' +
+              '<div style="font-size: 13px; font-weight: bold; text-transform: uppercase;">' + FIRM.name + '</div>' +
+              '<div style="font-size: 9px; margin-top: 3px; line-height: 1.3;">' + FIRM.address.replace(/\n/g, '<br>') + '</div>' +
+              '<div style="font-size: 9px; margin-top: 4px;">' +
+                '<b>GSTIN/UIN:</b> ' + FIRM.gstin + '<br>' +
+                '<b>State Name:</b> ' + FIRM.state + ', <b>Code:</b> ' + FIRM.stateCode +
+              '</div>' +
+            '</td>' +
+
+            // Invoice Metadata Box
+            '<td style="width: 48%; vertical-align: top; padding: 0;">' +
+              '<table style="width: 100%;">' +
+                '<tr>' +
+                  '<td style="width: 50%; border-right: 1px solid #000000; border-bottom: 1px solid #000000; padding: 4px;">' +
+                    '<div style="font-size: 8px; color: #555;">Invoice No.</div>' +
+                    '<div style="font-size: 11px; font-weight: bold;">' + invoiceNo + '</div>' +
+                  '</td>' +
+                  '<td style="width: 50%; border-bottom: 1px solid #000000; padding: 4px;">' +
+                    '<div style="font-size: 8px; color: #555;">Dated</div>' +
+                    '<div style="font-size: 10px; font-weight: bold;">' + date + '</div>' +
+                  '</td>' +
+                '</tr>' +
+                '<tr>' +
+                  '<td style="border-right: 1px solid #000000; border-bottom: 1px solid #000000; padding: 4px;">' +
+                    '<div style="font-size: 8px; color: #555;">Buyer’s Order No.</div>' +
+                    '<div style="font-size: 10px; font-weight: bold;">' + buyerOrderNo + '</div>' +
+                  '</td>' +
+                  '<td style="border-bottom: 1px solid #000000; padding: 4px;">' +
+                    '<div style="font-size: 8px; color: #555;">Order Dated</div>' +
+                    '<div style="font-size: 10px;">' + buyerOrderDate + '</div>' +
+                  '</td>' +
+                '</tr>' +
+                '<tr>' +
+                  '<td style="border-right: 1px solid #000000; border-bottom: 1px solid #000000; padding: 4px;">' +
+                    '<div style="font-size: 8px; color: #555;">Despatched through</div>' +
+                    '<div style="font-size: 10px;">' + despatchedThrough + '</div>' +
+                  '</td>' +
+                  '<td style="border-bottom: 1px solid #000000; padding: 4px;">' +
+                    '<div style="font-size: 8px; color: #555;">Destination</div>' +
+                    '<div style="font-size: 10px;">' + destination + '</div>' +
+                  '</td>' +
+                '</tr>' +
+                '<tr>' +
+                  '<td colspan="2" style="padding: 4px;">' +
+                    '<div style="font-size: 8px; color: #555;">Terms of Delivery</div>' +
+                    '<div style="font-size: 9px;">' + termsOfDelivery + '</div>' +
+                  '</td>' +
+                '</tr>' +
+              '</table>' +
+            '</td>' +
+          '</tr>' +
+
+          // Buyer Section
+          '<tr>' +
+            '<td colspan="2" style="border-top: 1px solid #000000; padding: 6px; background-color: #fbfbfb;">' +
+              '<div style="font-size: 8px; font-weight: bold; text-transform: uppercase; color: #555;">Buyer (Bill to)</div>' +
+              '<div style="font-size: 11px; font-weight: bold; text-transform: uppercase; margin-top: 1px;">' + buyerName + '</div>' +
+              (buyerAddress ? '<div style="font-size: 9px; margin-top: 2px;">' + buyerAddress + '</div>' : '') +
+              '<div style="font-size: 9px; margin-top: 2px;">' +
+                '<b>GSTIN/UIN:</b> ' + buyerGstin + ' &nbsp;&nbsp;|&nbsp;&nbsp; ' +
+                '<b>State Name:</b> ' + buyerState + ', <b>Code:</b> ' + buyerStateCode +
+              '</div>' +
+            '</td>' +
+          '</tr>' +
+        '</table>' +
+
+        // Line Items Table
+        '<table style="width: 100%; border-bottom: 2px solid #000000;">' +
+          '<thead>' +
+            '<tr style="background-color: #f0f0f0; border-bottom: 1px solid #000000;">' +
+              '<th style="border-right: 1px solid #000000; padding: 5px; width: 5%; text-align: center;">S.No</th>' +
+              '<th style="border-right: 1px solid #000000; padding: 5px; width: 45%; text-align: left;">Description of Goods</th>' +
+              '<th style="border-right: 1px solid #000000; padding: 5px; width: 12%; text-align: center;">HSN/SAC</th>' +
+              '<th style="border-right: 1px solid #000000; padding: 5px; width: 12%; text-align: center;">Quantity</th>' +
+              '<th style="border-right: 1px solid #000000; padding: 5px; width: 9%; text-align: right;">Rate</th>' +
+              '<th style="border-right: 1px solid #000000; padding: 5px; width: 5%; text-align: center;">per</th>' +
+              '<th style="padding: 5px; width: 12%; text-align: right;">Amount (₹)</th>' +
+            '</tr>' +
+          '</thead>' +
+          '<tbody>' +
+            itemsRows +
+            // Subtotal / Taxable Row
+            '<tr style="border-top: 1px solid #000000;">' +
+              '<td colspan="6" style="border-right: 1px solid #000000; padding: 4px 6px; text-align: right; font-weight: bold;">Taxable Value:</td>' +
+              '<td style="padding: 4px 6px; text-align: right; font-weight: bold;">₹' + taxableRupees + '</td>' +
+            '</tr>' +
+            // CGST Row
+            '<tr>' +
+              '<td colspan="6" style="border-right: 1px solid #000000; padding: 3px 6px; text-align: right; color: #444;">Output CGST:</td>' +
+              '<td style="padding: 3px 6px; text-align: right;">₹' + cgstRupees + '</td>' +
+            '</tr>' +
+            // SGST Row
+            '<tr>' +
+              '<td colspan="6" style="border-right: 1px solid #000000; padding: 3px 6px; text-align: right; color: #444;">Output SGST:</td>' +
+              '<td style="padding: 3px 6px; text-align: right;">₹' + sgstRupees + '</td>' +
+            '</tr>' +
+            // Total Row
+            '<tr style="border-top: 2px solid #000000; background-color: #f7f7f7;">' +
+              '<td colspan="6" style="border-right: 1px solid #000000; padding: 5px 6px; text-align: right; font-size: 11px; font-weight: bold;">TOTAL:</td>' +
+              '<td style="padding: 5px 6px; text-align: right; font-size: 12px; font-weight: bold;">₹' + payableRupees + '</td>' +
+            '</tr>' +
+          '</tbody>' +
+        '</table>' +
+
+        // Amount in Words
+        '<div style="padding: 6px 8px; border-bottom: 1px solid #000000; font-size: 10px;">' +
+          '<b>Amount Chargeable (in words):</b><br>' +
+          '<span style="font-weight: bold; text-transform: uppercase;">' + escapeHtml(amountWords) + '</span>' +
+        '</div>' +
+
+        // HSN Summary Section
+        '<div style="padding: 6px 8px; border-bottom: 1px solid #000000;">' +
+          '<div style="font-size: 9px; font-weight: bold; margin-bottom: 4px; text-transform: uppercase;">Tax Amount (in words): HSN/SAC Breakdown</div>' +
+          '<table style="width: 100%; border: 1px solid #000000; font-size: 9px;">' +
+            '<thead>' +
+              '<tr style="background-color: #f0f0f0;">' +
+                '<th rowspan="2" style="border: 1px solid #000; padding: 3px;">HSN/SAC</th>' +
+                '<th rowspan="2" style="border: 1px solid #000; padding: 3px;">Taxable Value</th>' +
+                '<th colspan="2" style="border: 1px solid #000; padding: 3px;">Central Tax</th>' +
+                '<th colspan="2" style="border: 1px solid #000; padding: 3px;">State Tax</th>' +
+                '<th rowspan="2" style="border: 1px solid #000; padding: 3px;">Total Tax</th>' +
+              '</tr>' +
+              '<tr style="background-color: #f0f0f0;">' +
+                '<th style="border: 1px solid #000; padding: 2px;">Rate</th>' +
+                '<th style="border: 1px solid #000; padding: 2px;">Amount</th>' +
+                '<th style="border: 1px solid #000; padding: 2px;">Rate</th>' +
+                '<th style="border: 1px solid #000; padding: 2px;">Amount</th>' +
+              '</tr>' +
+            '</thead>' +
+            '<tbody>' +
+              hsnSummaryRows +
+              '<tr style="font-weight: bold; background-color: #f7f7f7;">' +
+                '<td style="border: 1px solid #000; padding: 3px; text-align: center;">Total</td>' +
+                '<td style="border: 1px solid #000; padding: 3px; text-align: right;">₹' + totalTaxableSummary.toFixed(2) + '</td>' +
+                '<td style="border: 1px solid #000; padding: 3px;">&nbsp;</td>' +
+                '<td style="border: 1px solid #000; padding: 3px; text-align: right;">₹' + totalCgstSummary.toFixed(2) + '</td>' +
+                '<td style="border: 1px solid #000; padding: 3px;">&nbsp;</td>' +
+                '<td style="border: 1px solid #000; padding: 3px; text-align: right;">₹' + totalSgstSummary.toFixed(2) + '</td>' +
+                '<td style="border: 1px solid #000; padding: 3px; text-align: right;">₹' + (totalCgstSummary + totalSgstSummary).toFixed(2) + '</td>' +
+              '</tr>' +
+            '</tbody>' +
+          '</table>' +
+        '</div>' +
+
+        // Bank Details & Declaration
+        '<table style="width: 100%; border-bottom: 2px solid #000000;">' +
+          '<tr>' +
+            '<td style="width: 50%; vertical-align: top; border-right: 1px solid #000000; padding: 6px; font-size: 9px;">' +
+              '<b>Company’s Bank Details:</b><br>' +
+              'Bank Name: <b>' + FIRM.bankName + '</b><br>' +
+              'A/c No.: <b>' + FIRM.accountNo + '</b><br>' +
+              'Branch & IFS Code: <b>' + FIRM.branch + ' &amp; ' + FIRM.ifsc + '</b>' +
+            '</td>' +
+            '<td style="width: 50%; vertical-align: top; padding: 6px; font-size: 8.5px; color: #444;">' +
+              '<b>Declaration:</b><br>' +
+              'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.' +
+            '</td>' +
+          '</tr>' +
+        '</table>' +
+
+        // Signatures (Pinned at bottom)
+        '<table style="width: 100%; height: 90px;">' +
+          '<tr>' +
+            '<td style="width: 50%; vertical-align: bottom; border-right: 1px solid #000000; padding: 8px; font-size: 9px; font-weight: bold;">' +
+              'Customer’s Seal and Signature' +
+            '</td>' +
+            '<td style="width: 50%; vertical-align: bottom; text-align: right; padding: 8px; font-size: 9px;">' +
+              '<div style="margin-bottom: 40px; font-weight: bold;">for ' + FIRM.name + '</div>' +
+              '<div style="font-weight: bold;">Authorised Signatory</div>' +
+            '</td>' +
+          '</tr>' +
+        '</table>' +
+
+      '</div>' +
+    '</body>' +
+    '</html>'
+  );
+}
+
+/**
+ * Mobile-friendly notification body for the email view
+ */
+function buildNotificationEmailHtml(data, action) {
+  const invoiceNo = escapeHtml(data.invoice_no || 'Draft');
+  const date = escapeHtml(data.date || new Date().toISOString().slice(0, 10));
+  const buyerName = escapeHtml(data.buyer_name || 'KH EXPORT INDIA PVT LTD');
+  const buyerAddress = escapeHtml(data.buyer_address || '');
+  const payableRupees = data.payable_rupees || (data.payable_paise ? (data.payable_paise / 100).toFixed(2) : '0.00');
+  const taxableRupees = data.taxable_rupees || (data.taxable_paise ? (data.taxable_paise / 100).toFixed(2) : '0.00');
+  const cgstRupees = data.cgst_rupees || (data.cgst_paise ? (data.cgst_paise / 100).toFixed(2) : '0.00');
+  const sgstRupees = data.sgst_rupees || (data.sgst_paise ? (data.sgst_paise / 100).toFixed(2) : '0.00');
+  const lines = data.lines || [];
+
+  let linesHtml = lines.map(function(item, idx) {
+    const rate = item.rate || (item.rate_paise ? (item.rate_paise / 100).toFixed(2) : '-');
+    const amt = item.amount_rupees || (item.taxable_value_paise ? (item.taxable_value_paise / 100).toFixed(2) : '-');
+    return (
+      '<tr style="border-bottom:1px solid #e2e8f0;">' +
+        '<td style="padding:8px;text-align:center;">' + (idx + 1) + '</td>' +
+        '<td style="padding:8px;font-weight:bold;">' + escapeHtml(item.description || '-') + '</td>' +
+        '<td style="padding:8px;text-align:center;">' + escapeHtml(item.hsn || '-') + '</td>' +
+        '<td style="padding:8px;text-align:center;">' + (item.quantity || 1) + ' ' + escapeHtml(item.unit || 'PCS') + '</td>' +
+        '<td style="padding:8px;text-align:right;">₹' + rate + '</td>' +
+        '<td style="padding:8px;text-align:center;">' + (item.gst_percent ? item.gst_percent + '%' : '-') + '</td>' +
+        '<td style="padding:8px;text-align:right;font-weight:bold;">₹' + amt + '</td>' +
+      '</tr>'
+    );
+  }).join('');
+
+  return (
+    '<div style="font-family:Arial,sans-serif;max-width:650px;margin:auto;border:1px solid #cbd5e1;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);">' +
+      '<div style="background:#0f172a;color:#ffffff;padding:20px;">' +
+        '<h2 style="margin:0;font-size:18px;letter-spacing:0.5px;">KHANSA ENTERPRISES</h2>' +
+        '<p style="margin:4px 0 0;font-size:12px;color:#94a3b8;">' +
+          action + ' — Invoice #' + invoiceNo + ' (' + date + ')' +
+        '</p>' +
+      '</div>' +
+
+      '<div style="padding:14px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:13px;">' +
+        '<strong>Billed To:</strong> ' + buyerName + '<br>' +
+        (buyerAddress ? '<span style="color:#64748b;font-size:12px;white-space:pre-line;">' + buyerAddress + '</span>' : '') +
+      '</div>' +
+
+      '<div style="padding:16px 20px;">' +
+        '<div style="font-size:12px;font-weight:bold;color:#475569;margin-bottom:8px;text-transform:uppercase;">Invoice Items</div>' +
+        '<table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+          '<thead>' +
+            '<tr style="background:#f1f5f9;color:#475569;">' +
+              '<th style="padding:6px;text-align:center;">#</th>' +
+              '<th style="padding:6px;text-align:left;">Description</th>' +
+              '<th style="padding:6px;text-align:center;">HSN</th>' +
+              '<th style="padding:6px;text-align:center;">Qty</th>' +
+              '<th style="padding:6px;text-align:right;">Rate</th>' +
+              '<th style="padding:6px;text-align:center;">GST</th>' +
+              '<th style="padding:6px;text-align:right;">Amount</th>' +
+            '</tr>' +
+          '</thead>' +
+          '<tbody>' + linesHtml + '</tbody>' +
+        '</table>' +
+      '</div>' +
+
+      '<div style="padding:16px 20px;background:#f8fafc;border-top:1px solid #e2e8f0;text-align:right;font-size:13px;">' +
+        '<div>Taxable: ₹' + taxableRupees + ' | CGST: ₹' + cgstRupees + ' | SGST: ₹' + sgstRupees + '</div>' +
+        '<div style="font-size:20px;font-weight:bold;color:#1e3a8a;margin-top:6px;">Total Payable: ₹' + payableRupees + '</div>' +
+      '</div>' +
+
+      '<div style="padding:12px 20px;background:#e2e8f0;text-align:center;font-size:11px;color:#334155;">' +
+        '📎 <b>The official GST Tax Invoice PDF is attached to this email.</b>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
+/**
+ * Run this test function directly inside Google Apps Script editor
+ * to verify the email and PDF attachment immediately!
+ */
+function testSendSampleInvoiceWithPdf() {
+  const sampleData = {
+    action: 'Test Dispatch',
+    invoice_no: 'TEST/001/26-27',
+    date: '2026-10-31',
+    buyer_name: 'KH EXPORT INDIA PRIVATE LIMITED',
+    buyer_address: 'DIVISION UNIT-2, PLOT NO.67-72, PHASE-1, SIPCOT\nRANIPET - 632 403',
+    buyer_gstin: '33AAACK4841R1ZA',
+    buyer_state: 'Tamil Nadu',
+    buyer_state_code: '33',
+    buyer_order_no: 'PO/2026/99',
+    buyer_order_date: '2026-10-30',
+    despatched_through: 'Lorry / By Road',
+    destination: 'SIPCOT RANIPET',
+    terms_of_delivery: 'Immediate',
+    taxable_rupees: '2635.33',
+    cgst_rupees: '65.88',
+    sgst_rupees: '65.88',
+    payable_rupees: '2767.10',
+    amount_in_words: 'INR Two Thousand Seven Hundred Sixty Seven and Ten Paise Only',
+    lines: [
+      {
+        description: 'BUN HEAD (PLASTIC)',
+        hsn: '39269099',
+        quantity: '24.000',
+        unit: 'PCS',
+        rate: '10.50',
+        gst_percent: '5',
+        amount_rupees: '252.00',
+      },
+      {
+        description: 'CHEST ROLLER BUSH',
+        hsn: '84539000',
+        quantity: '50.000',
+        unit: 'PCS',
+        rate: '47.66',
+        gst_percent: '5',
+        amount_rupees: '2383.33',
+      },
+    ],
+  };
+
+  const fakeEvent = {
+    postData: {
+      contents: JSON.stringify(sampleData),
+    },
+  };
+
+  const result = doPost(fakeEvent);
+  Logger.log('Result: ' + result.getContent());
+}
