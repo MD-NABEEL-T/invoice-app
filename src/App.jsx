@@ -11,6 +11,7 @@ import Settings from './pages/Settings.jsx';
 import Buyers from './pages/Buyers.jsx';
 import Items from './pages/Items.jsx';
 import ItemImport from './pages/ItemImport.jsx';
+import MonthlyReportImport from './pages/MonthlyReportImport.jsx';
 import PwaUpdateBanner from './components/PwaUpdateBanner.jsx';
 
 // Dev-only route for fixture and print layout testing (excluded in production build)
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="buyers" element={<Buyers />} />
           <Route path="items" element={<Items />} />
           <Route path="items/import" element={<ItemImport />} />
+          <Route path="reports/import" element={<MonthlyReportImport />} />
         </Route>
 
         {/* Dev-only route for A4 invoice print/PDF test fixtures */}

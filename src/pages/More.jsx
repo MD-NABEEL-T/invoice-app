@@ -43,6 +43,16 @@ export default function More() {
       ),
     },
     {
+      id: 'import-reports',
+      title: 'Import Monthly Bills (.xlsx)',
+      desc: 'Upload past monthly Excel workbooks into the database',
+      icon: (
+        <svg className="w-6 h-6 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        </svg>
+      ),
+    },
+    {
       id: 'settings',
       title: 'App Settings',
       desc: 'FY starting bill number, copy labels, and firm profile',
@@ -212,6 +222,7 @@ export default function More() {
                   if (item.id === 'buyers') navigate('/buyers');
                   else if (item.id === 'items') navigate('/items');
                   else if (item.id === 'reports') navigate('/reports');
+                  else if (item.id === 'import-reports') navigate('/reports/import');
                   else if (item.id === 'settings') navigate('/settings');
                   else if (item.id === 'backup') {
                     setBackupStatus('');
