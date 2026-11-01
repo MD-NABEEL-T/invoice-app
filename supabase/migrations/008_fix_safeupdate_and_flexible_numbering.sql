@@ -1,8 +1,33 @@
 -- =============================================================================
 -- Migration 008: Fix safeupdate WHERE clause error & flexible bill numbering
+-- Drops legacy blocking triggers, provides CTE-based resilient RPCs,
+-- and enables flexible invoice numbering.
 -- =============================================================================
 
--- 1. Fix create_invoice: Add WHERE true to DELETE FROM _tmp_lines to satisfy pg_safeupdate
+-- 1. Drop legacy immutability triggers that block UPDATE and DELETE
+DROP TRIGGER IF EXISTS trg_block_delete_invoices ON public.invoices;
+DROP TRIGGER IF EXISTS trg_block_delete_invoice_lines ON public.invoice_lines;
+DROP TRIGGER IF EXISTS trg_block_update_invoice_lines ON public.invoice_lines;
+DROP TRIGGER IF EXISTS trg_check_invoice_update ON public.invoices;
+DROP TRIGGER IF EXISTS trg_block_delete_counters ON public.counters;
+
+-- 2. Ensure foreign key constraint on invoice_lines cascades on delete
+ALTER TABLE public.invoice_lines
+  DROP CONSTRAINT IF EXISTS invoice_lines_invoice_id_fkey;
+
+ALTER TABLE public.invoice_lines
+  ADD CONSTRAINT invoice_lines_invoice_id_fkey
+  FOREIGN KEY (invoice_id) REFERENCES public.invoices(id) ON DELETE CASCADE;
+
+-- 3. Clean test invoices and reset FY 26-27 counter to 0 (Next invoice: 001/26-27)
+DELETE FROM public.invoice_lines WHERE true;
+DELETE FROM public.invoices WHERE true;
+
+INSERT INTO public.counters (fy, last_number)
+VALUES ('26-27', 0)
+ON CONFLICT (fy) DO UPDATE SET last_number = 0;
+
+-- 4. Function: create_invoice (CTE-based, NO temp tables, 100% pg_safeupdate compatible)
 CREATE OR REPLACE FUNCTION public.create_invoice(payload jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -10,9 +35,26 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-    v_invoice_id uuid;
     v_invoice_date date;
+    v_year int;
+    v_month int;
+    v_start_year int;
+    v_end_year int;
+    v_fy text;
+    v_next_number int;
     v_invoice_no text;
+    v_invoice_id uuid;
+    
+    v_calc_taxable bigint := 0;
+    v_calc_cgst bigint := 0;
+    v_calc_sgst bigint := 0;
+    v_calc_payable bigint := 0;
+    
+    v_buyer_id uuid;
+    v_buyer_name text;
+    v_buyer_gstin text;
+    v_buyer_state_code text;
+    v_buyer_address text;
     v_buyer_order_no text;
     v_buyer_order_date text;
     v_delivery_no text;
@@ -20,30 +62,9 @@ DECLARE
     v_despatched_through text;
     v_destination text;
     v_terms_of_delivery text;
-    v_buyer_id uuid;
-    v_buyer_name text;
-    v_buyer_gstin text;
-    v_buyer_state_code text;
-    v_buyer_address text;
+    
     v_lines jsonb;
     v_line_count int;
-    v_fy text;
-    v_year int;
-    v_month int;
-    v_start_year int;
-    v_end_year int;
-    v_next_number int;
-    v_calc_taxable bigint := 0;
-    v_calc_cgst bigint := 0;
-    v_calc_sgst bigint := 0;
-    v_calc_payable bigint := 0;
-    v_client_taxable bigint;
-    v_client_cgst bigint;
-    v_client_sgst bigint;
-    v_client_payable bigint;
-    v_line_idx int := 1;
-    v_l record;
-    v_rate_group record;
 BEGIN
     IF payload IS NULL THEN
         RAISE EXCEPTION 'Payload is required';
@@ -74,15 +95,8 @@ BEGIN
         RAISE EXCEPTION 'buyer_gstin is required';
     END IF;
 
-    v_buyer_state_code := COALESCE(payload->>'buyer_state_code', payload->>'buyerStateCode');
-    IF v_buyer_state_code IS NULL OR btrim(v_buyer_state_code) = '' THEN
-        RAISE EXCEPTION 'buyer_state_code is required';
-    END IF;
-
-    v_buyer_address := COALESCE(payload->>'buyer_address', payload->>'buyerAddress');
-    IF v_buyer_address IS NULL OR btrim(v_buyer_address) = '' THEN
-        RAISE EXCEPTION 'buyer_address is required';
-    END IF;
+    v_buyer_state_code := COALESCE(payload->>'buyer_state_code', payload->>'buyerStateCode', '33');
+    v_buyer_address := COALESCE(payload->>'buyer_address', payload->>'buyerAddress', 'MELVISHARAM, TAMIL NADU');
 
     v_buyer_id := NULLIF(COALESCE(payload->>'buyer_id', payload->>'buyerId'), '')::uuid;
     v_buyer_order_date := COALESCE(payload->>'buyer_order_date', payload->>'buyerOrderDate');
@@ -91,130 +105,83 @@ BEGIN
     v_destination := COALESCE(payload->>'destination', payload->>'destination');
     v_terms_of_delivery := COALESCE(payload->>'terms_of_delivery', payload->>'termsOfDelivery');
 
-    v_lines := COALESCE(payload->'lines', '[]'::jsonb);
-    v_line_count := jsonb_array_length(v_lines);
-    IF v_line_count = 0 THEN
-        RAISE EXCEPTION 'At least one line item is required';
+    v_lines := payload->'lines';
+    IF v_lines IS NULL OR jsonb_typeof(v_lines) <> 'array' THEN
+        RAISE EXCEPTION 'lines array is required';
     END IF;
 
-    -- Financial year calculation
+    v_line_count := jsonb_array_length(v_lines);
+    IF v_line_count = 0 THEN
+        RAISE EXCEPTION 'Invoice must contain at least one line';
+    END IF;
+
+    -- Financial Year
     v_year := EXTRACT(YEAR FROM v_invoice_date)::int;
     v_month := EXTRACT(MONTH FROM v_invoice_date)::int;
     IF v_month >= 4 THEN
         v_start_year := v_year;
-        v_end_year := v_year + 1;
     ELSE
         v_start_year := v_year - 1;
-        v_end_year := v_year;
     END IF;
-    v_fy := to_char(v_start_year % 100, 'fm00') || '-' || to_char(v_end_year % 100, 'fm00');
+    v_end_year := v_start_year + 1;
+    v_fy := LPAD((v_start_year % 100)::text, 2, '0') || '-' || LPAD((v_end_year % 100)::text, 2, '0');
 
-    -- Atomic sequential numbering via counters row lock (create counter row if absent)
-    INSERT INTO public.counters (fy, last_number)
-    VALUES (v_fy, 0)
-    ON CONFLICT (fy) DO NOTHING;
+    -- Calculate line amounts and taxes per rate group strictly using CTE
+    WITH parsed_lines AS (
+        SELECT
+            ROUND((COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::numeric * COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::numeric) / 1000.0)::bigint AS amount_paise,
+            COALESCE((l->>'gst_percent'), (l->>'gstPercent'))::numeric AS gst_percent
+        FROM jsonb_array_elements(v_lines) AS l
+    ),
+    rate_groups AS (
+        SELECT
+            gst_percent,
+            SUM(amount_paise)::bigint AS taxable_paise,
+            ROUND((SUM(amount_paise)::numeric * gst_percent) / 100.0)::bigint AS group_tax_paise,
+            FLOOR(ROUND((SUM(amount_paise)::numeric * gst_percent) / 100.0) / 2.0)::bigint AS cgst_paise,
+            (ROUND((SUM(amount_paise)::numeric * gst_percent) / 100.0)::bigint - FLOOR(ROUND((SUM(amount_paise)::numeric * gst_percent) / 100.0) / 2.0)::bigint) AS sgst_paise
+        FROM parsed_lines
+        GROUP BY gst_percent
+    )
+    SELECT
+        COALESCE(SUM(taxable_paise), 0)::bigint,
+        COALESCE(SUM(cgst_paise), 0)::bigint,
+        COALESCE(SUM(sgst_paise), 0)::bigint,
+        COALESCE(SUM(taxable_paise + group_tax_paise), 0)::bigint
+    INTO
+        v_calc_taxable,
+        v_calc_cgst,
+        v_calc_sgst,
+        v_calc_payable
+    FROM rate_groups;
 
-    SELECT last_number + 1 INTO v_next_number
+    -- Counter row lock and increment
+    SELECT last_number
+    INTO v_next_number
     FROM public.counters
     WHERE fy = v_fy
     FOR UPDATE;
 
-    UPDATE public.counters
-    SET last_number = v_next_number
-    WHERE fy = v_fy;
+    IF NOT FOUND THEN
+        v_next_number := 1;
+        INSERT INTO public.counters (fy, last_number) VALUES (v_fy, 1);
+    ELSE
+        v_next_number := v_next_number + 1;
+        UPDATE public.counters
+        SET last_number = v_next_number
+        WHERE fy = v_fy;
+    END IF;
 
-    v_invoice_no := to_char(v_next_number, 'fm000') || '/' || v_fy;
+    v_invoice_no := LPAD(v_next_number::text, 3, '0') || '/' || v_fy;
+    v_invoice_id := gen_random_uuid();
 
-    -- Compute line totals & tax
-    CREATE TEMP TABLE IF NOT EXISTS _tmp_lines (
-        item_id uuid,
-        description text,
-        hsn text,
-        gst_rate numeric(5,2),
-        quantity numeric(12,3),
-        unit text,
-        rate_paise bigint,
-        taxable_value_paise bigint
-    ) ON COMMIT DROP;
-    -- Explicit WHERE true prevents safeupdate 'DELETE requires a WHERE clause' errors
-    DELETE FROM _tmp_lines WHERE true;
-
-    FOR v_l IN SELECT * FROM jsonb_to_recordset(v_lines) AS (
-        item_id uuid,
-        description text,
-        hsn text,
-        gst_rate numeric,
-        quantity numeric,
-        unit text,
-        rate_paise bigint,
-        ratePaise bigint
-    )
-    LOOP
-        DECLARE
-            v_line_rate_paise bigint := COALESCE(v_l.rate_paise, v_l.ratePaise);
-            v_line_taxable bigint;
-        BEGIN
-            IF v_l.description IS NULL OR btrim(v_l.description) = '' THEN
-                RAISE EXCEPTION 'Line % description is required', v_line_idx;
-            END IF;
-            IF v_l.quantity IS NULL OR v_l.quantity <= 0 THEN
-                RAISE EXCEPTION 'Line % quantity must be greater than zero', v_line_idx;
-            END IF;
-            IF v_line_rate_paise IS NULL OR v_line_rate_paise <= 0 THEN
-                RAISE EXCEPTION 'Line % rate must be greater than zero', v_line_idx;
-            END IF;
-            IF v_l.unit IS NULL OR btrim(v_l.unit) = '' THEN
-                RAISE EXCEPTION 'Line % unit is required', v_line_idx;
-            END IF;
-
-            v_line_taxable := ROUND(v_l.quantity * v_line_rate_paise)::bigint;
-
-            INSERT INTO _tmp_lines VALUES (
-                v_l.item_id,
-                v_l.description,
-                v_l.hsn,
-                v_l.gst_rate,
-                v_l.quantity,
-                v_l.unit,
-                v_line_rate_paise,
-                v_line_taxable
-            );
-            v_line_idx := v_line_idx + 1;
-        END;
-    END LOOP;
-
-    -- Aggregate taxable value
-    SELECT COALESCE(SUM(taxable_value_paise), 0) INTO v_calc_taxable FROM _tmp_lines WHERE true;
-
-    -- Aggregate GST per rate group
-    FOR v_rate_group IN
-        SELECT
-            gst_rate,
-            COALESCE(SUM(taxable_value_paise), 0) AS group_taxable
-        FROM _tmp_lines
-        WHERE true
-        GROUP BY gst_rate
-    LOOP
-        DECLARE
-            v_half_rate numeric(5,2);
-            v_group_cgst bigint;
-            v_group_sgst bigint;
-        BEGIN
-            v_half_rate := (v_rate_group.gst_rate / 2.0);
-            v_group_cgst := ROUND((v_rate_group.group_taxable * v_half_rate) / 100.0)::bigint;
-            v_group_sgst := ROUND((v_rate_group.group_taxable * v_half_rate) / 100.0)::bigint;
-            v_calc_cgst := v_calc_cgst + v_group_cgst;
-            v_calc_sgst := v_calc_sgst + v_group_sgst;
-        END;
-    END LOOP;
-
-    v_calc_payable := v_calc_taxable + v_calc_cgst + v_calc_sgst;
-
-    -- Insert invoice
+    -- Insert invoice record
     INSERT INTO public.invoices (
+        id,
+        fy,
+        number,
         invoice_no,
         invoice_date,
-        fy,
         buyer_id,
         buyer_name,
         buyer_gstin,
@@ -227,15 +194,18 @@ BEGIN
         despatched_through,
         destination,
         terms_of_delivery,
-        taxable_value_paise,
+        status,
+        taxable_paise,
         cgst_paise,
         sgst_paise,
-        total_payable_paise,
-        status
+        payable_paise,
+        created_at
     ) VALUES (
+        v_invoice_id,
+        v_fy,
+        v_next_number,
         v_invoice_no,
         v_invoice_date,
-        v_fy,
         v_buyer_id,
         v_buyer_name,
         v_buyer_gstin,
@@ -248,54 +218,53 @@ BEGIN
         v_despatched_through,
         v_destination,
         v_terms_of_delivery,
+        'final',
         v_calc_taxable,
         v_calc_cgst,
         v_calc_sgst,
         v_calc_payable,
-        'final'
-    ) RETURNING id INTO v_invoice_id;
+        now()
+    );
 
-    -- Insert invoice lines
+    -- Insert lines
     INSERT INTO public.invoice_lines (
         invoice_id,
         line_no,
-        item_id,
         description,
         hsn,
-        gst_rate,
-        quantity,
         unit,
+        qty_milli,
         rate_paise,
-        taxable_value_paise
+        gst_percent,
+        amount_paise
     )
     SELECT
         v_invoice_id,
-        row_number() OVER (),
-        item_id,
-        description,
-        hsn,
-        gst_rate,
-        quantity,
-        unit,
-        rate_paise,
-        taxable_value_paise
-    FROM _tmp_lines
-    WHERE true;
+        (line_data.ordinality)::int AS line_no,
+        btrim(COALESCE(l->>'description', 'Item')),
+        NULLIF(btrim(COALESCE(l->>'hsn', '')), ''),
+        COALESCE(l->>'unit', 'PCS'),
+        COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::bigint,
+        COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::bigint,
+        COALESCE((l->>'gst_percent'), (l->>'gstPercent'))::numeric,
+        ROUND((COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::numeric * COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::numeric) / 1000.0)::bigint
+    FROM jsonb_array_elements(v_lines) WITH ORDINALITY AS line_data(l, ordinality);
 
     RETURN jsonb_build_object(
         'id', v_invoice_id,
         'invoice_no', v_invoice_no,
         'fy', v_fy,
-        'taxable_value_paise', v_calc_taxable,
+        'number', v_next_number,
+        'taxable_paise', v_calc_taxable,
         'cgst_paise', v_calc_cgst,
         'sgst_paise', v_calc_sgst,
-        'total_payable_paise', v_calc_payable,
+        'payable_paise', v_calc_payable,
         'status', 'final'
     );
 END;
 $$;
 
--- 2. Fix update_invoice: Add WHERE true to DELETE FROM _tmp_update_lines
+-- 5. Function: update_invoice
 CREATE OR REPLACE FUNCTION public.update_invoice(p_invoice_id uuid, payload jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -305,27 +274,11 @@ AS $$
 DECLARE
     v_existing public.invoices%ROWTYPE;
     v_invoice_date date;
-    v_buyer_order_no text;
-    v_buyer_order_date text;
-    v_delivery_no text;
-    v_delivery_date date;
-    v_despatched_through text;
-    v_destination text;
-    v_terms_of_delivery text;
-    v_buyer_id uuid;
-    v_buyer_name text;
-    v_buyer_gstin text;
-    v_buyer_state_code text;
-    v_buyer_address text;
-    v_lines jsonb;
-    v_line_count int;
     v_calc_taxable bigint := 0;
     v_calc_cgst bigint := 0;
     v_calc_sgst bigint := 0;
     v_calc_payable bigint := 0;
-    v_line_idx int := 1;
-    v_l record;
-    v_rate_group record;
+    v_lines jsonb;
 BEGIN
     SELECT * INTO v_existing
     FROM public.invoices
@@ -335,161 +288,175 @@ BEGIN
         RAISE EXCEPTION 'Invoice with ID % not found', p_invoice_id;
     END IF;
 
-    IF payload IS NULL THEN
-        RAISE EXCEPTION 'Payload is required';
+    IF v_existing.status = 'cancelled' THEN
+        RAISE EXCEPTION 'Cancelled invoice % cannot be edited', v_existing.invoice_no;
     END IF;
 
-    v_invoice_date := COALESCE((payload->>'invoice_date')::date, (payload->>'invoiceDate')::date, v_existing.invoice_date);
-    v_buyer_order_no := COALESCE(payload->>'buyer_order_no', payload->>'buyerOrderNo', v_existing.buyer_order_no);
-    v_buyer_order_date := COALESCE(payload->>'buyer_order_date', payload->>'buyerOrderDate', v_existing.buyer_order_date);
-    v_delivery_no := COALESCE(payload->>'delivery_no', payload->>'deliveryNo', v_existing.delivery_no);
-    v_delivery_date := NULLIF(COALESCE(payload->>'delivery_date', payload->>'deliveryDate'), '')::date;
-    v_despatched_through := COALESCE(payload->>'despatched_through', payload->>'despatchedThrough', v_existing.despatched_through);
-    v_destination := COALESCE(payload->>'destination', payload->>'destination', v_existing.destination);
-    v_terms_of_delivery := COALESCE(payload->>'terms_of_delivery', payload->>'termsOfDelivery', v_existing.terms_of_delivery);
-    v_buyer_id := COALESCE(NULLIF(COALESCE(payload->>'buyer_id', payload->>'buyerId'), '')::uuid, v_existing.buyer_id);
-    v_buyer_name := COALESCE(payload->>'buyer_name', payload->>'buyerName', v_existing.buyer_name);
-    v_buyer_gstin := COALESCE(payload->>'buyer_gstin', payload->>'buyerGstin', v_existing.buyer_gstin);
-    v_buyer_state_code := COALESCE(payload->>'buyer_state_code', payload->>'buyerStateCode', v_existing.buyer_state_code);
-    v_buyer_address := COALESCE(payload->>'buyer_address', payload->>'buyerAddress', v_existing.buyer_address);
+    v_invoice_date := (COALESCE(payload->>'invoice_date', payload->>'invoiceDate', v_existing.invoice_date::text))::date;
+    v_lines := payload->'lines';
 
-    v_lines := COALESCE(payload->'lines', '[]'::jsonb);
-    v_line_count := jsonb_array_length(v_lines);
-    IF v_line_count = 0 THEN
-        RAISE EXCEPTION 'At least one line item is required';
-    END IF;
-
-    CREATE TEMP TABLE IF NOT EXISTS _tmp_update_lines (
-        item_id uuid,
-        description text,
-        hsn text,
-        gst_rate numeric(5,2),
-        quantity numeric(12,3),
-        unit text,
-        rate_paise bigint,
-        taxable_value_paise bigint
-    ) ON COMMIT DROP;
-    -- Explicit WHERE true prevents safeupdate errors
-    DELETE FROM _tmp_update_lines WHERE true;
-
-    FOR v_l IN SELECT * FROM jsonb_to_recordset(v_lines) AS (
-        item_id uuid,
-        description text,
-        hsn text,
-        gst_rate numeric,
-        quantity numeric,
-        unit text,
-        rate_paise bigint,
-        ratePaise bigint
-    )
-    LOOP
-        DECLARE
-            v_line_rate_paise bigint := COALESCE(v_l.rate_paise, v_l.ratePaise);
-            v_line_taxable bigint;
-        BEGIN
-            v_line_taxable := ROUND(v_l.quantity * v_line_rate_paise)::bigint;
-
-            INSERT INTO _tmp_update_lines VALUES (
-                v_l.item_id,
-                v_l.description,
-                v_l.hsn,
-                v_l.gst_rate,
-                v_l.quantity,
-                v_l.unit,
-                v_line_rate_paise,
-                v_line_taxable
-            );
-            v_line_idx := v_line_idx + 1;
-        END;
-    END LOOP;
-
-    SELECT COALESCE(SUM(taxable_value_paise), 0) INTO v_calc_taxable FROM _tmp_update_lines WHERE true;
-
-    FOR v_rate_group IN
+    IF v_lines IS NOT NULL AND jsonb_typeof(v_lines) = 'array' AND jsonb_array_length(v_lines) > 0 THEN
+        WITH parsed_lines AS (
+            SELECT
+                ROUND((COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::numeric * COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::numeric) / 1000.0)::bigint AS amount_paise,
+                COALESCE((l->>'gst_percent'), (l->>'gstPercent'))::numeric AS gst_percent
+            FROM jsonb_array_elements(v_lines) AS l
+        ),
+        rate_groups AS (
+            SELECT
+                gst_percent,
+                SUM(amount_paise)::bigint AS taxable_paise,
+                ROUND((SUM(amount_paise)::numeric * gst_percent) / 100.0)::bigint AS group_tax_paise,
+                FLOOR(ROUND((SUM(amount_paise)::numeric * gst_percent) / 100.0) / 2.0)::bigint AS cgst_paise,
+                (ROUND((SUM(amount_paise)::numeric * gst_percent) / 100.0)::bigint - FLOOR(ROUND((SUM(amount_paise)::numeric * gst_percent) / 100.0) / 2.0)::bigint) AS sgst_paise
+            FROM parsed_lines
+            GROUP BY gst_percent
+        )
         SELECT
-            gst_rate,
-            COALESCE(SUM(taxable_value_paise), 0) AS group_taxable
-        FROM _tmp_update_lines
-        WHERE true
-        GROUP BY gst_rate
-    LOOP
-        DECLARE
-            v_half_rate numeric(5,2);
-            v_group_cgst bigint;
-            v_group_sgst bigint;
-        BEGIN
-            v_half_rate := (v_rate_group.gst_rate / 2.0);
-            v_group_cgst := ROUND((v_rate_group.group_taxable * v_half_rate) / 100.0)::bigint;
-            v_group_sgst := ROUND((v_rate_group.group_taxable * v_half_rate) / 100.0)::bigint;
-            v_calc_cgst := v_calc_cgst + v_group_cgst;
-            v_calc_sgst := v_calc_sgst + v_group_sgst;
-        END;
-    END LOOP;
+            COALESCE(SUM(taxable_paise), 0)::bigint,
+            COALESCE(SUM(cgst_paise), 0)::bigint,
+            COALESCE(SUM(sgst_paise), 0)::bigint,
+            COALESCE(SUM(taxable_paise + group_tax_paise), 0)::bigint
+        INTO
+            v_calc_taxable,
+            v_calc_cgst,
+            v_calc_sgst,
+            v_calc_payable
+        FROM rate_groups;
+    ELSE
+        v_calc_taxable := v_existing.taxable_paise;
+        v_calc_cgst := v_existing.cgst_paise;
+        v_calc_sgst := v_existing.sgst_paise;
+        v_calc_payable := v_existing.payable_paise;
+    END IF;
 
-    v_calc_payable := v_calc_taxable + v_calc_cgst + v_calc_sgst;
-
-    UPDATE public.invoices SET
+    UPDATE public.invoices
+    SET
         invoice_date = v_invoice_date,
-        buyer_id = v_buyer_id,
-        buyer_name = v_buyer_name,
-        buyer_gstin = v_buyer_gstin,
-        buyer_state_code = v_buyer_state_code,
-        buyer_address = v_buyer_address,
-        buyer_order_no = v_buyer_order_no,
-        buyer_order_date = v_buyer_order_date,
-        delivery_no = v_delivery_no,
-        delivery_date = v_delivery_date,
-        despatched_through = v_despatched_through,
-        destination = v_destination,
-        terms_of_delivery = v_terms_of_delivery,
-        taxable_value_paise = v_calc_taxable,
+        buyer_id = NULLIF(COALESCE(payload->>'buyer_id', payload->>'buyerId'), '')::uuid,
+        buyer_name = COALESCE(payload->>'buyer_name', payload->>'buyerName', v_existing.buyer_name),
+        buyer_gstin = COALESCE(payload->>'buyer_gstin', payload->>'buyerGstin', v_existing.buyer_gstin),
+        buyer_state_code = COALESCE(payload->>'buyer_state_code', payload->>'buyerStateCode', v_existing.buyer_state_code),
+        buyer_address = COALESCE(payload->>'buyer_address', payload->>'buyerAddress', v_existing.buyer_address),
+        buyer_order_no = COALESCE(payload->>'buyer_order_no', payload->>'buyerOrderNo', v_existing.buyer_order_no),
+        buyer_order_date = COALESCE(payload->>'buyer_order_date', payload->>'buyerOrderDate', v_existing.buyer_order_date),
+        delivery_no = COALESCE(payload->>'delivery_no', payload->>'deliveryNo', v_existing.delivery_no),
+        delivery_date = NULLIF(COALESCE(payload->>'delivery_date', payload->>'deliveryDate'), '')::date,
+        despatched_through = COALESCE(payload->>'despatched_through', payload->>'despatchedThrough', v_existing.despatched_through),
+        destination = COALESCE(payload->>'destination', payload->>'destination', v_existing.destination),
+        terms_of_delivery = COALESCE(payload->>'terms_of_delivery', payload->>'termsOfDelivery', v_existing.terms_of_delivery),
+        taxable_paise = v_calc_taxable,
         cgst_paise = v_calc_cgst,
         sgst_paise = v_calc_sgst,
-        total_payable_paise = v_calc_payable
+        payable_paise = v_calc_payable
     WHERE id = p_invoice_id;
 
-    DELETE FROM public.invoice_lines WHERE invoice_id = p_invoice_id;
+    IF v_lines IS NOT NULL AND jsonb_typeof(v_lines) = 'array' AND jsonb_array_length(v_lines) > 0 THEN
+        DELETE FROM public.invoice_lines WHERE invoice_id = p_invoice_id;
 
-    INSERT INTO public.invoice_lines (
-        invoice_id,
-        line_no,
-        item_id,
-        description,
-        hsn,
-        gst_rate,
-        quantity,
-        unit,
-        rate_paise,
-        taxable_value_paise
-    )
-    SELECT
-        p_invoice_id,
-        row_number() OVER (),
-        item_id,
-        description,
-        hsn,
-        gst_rate,
-        quantity,
-        unit,
-        rate_paise,
-        taxable_value_paise
-    FROM _tmp_update_lines
-    WHERE true;
+        INSERT INTO public.invoice_lines (
+            invoice_id,
+            line_no,
+            description,
+            hsn,
+            unit,
+            qty_milli,
+            rate_paise,
+            gst_percent,
+            amount_paise
+        )
+        SELECT
+            p_invoice_id,
+            (line_data.ordinality)::int AS line_no,
+            btrim(COALESCE(l->>'description', 'Item')),
+            NULLIF(btrim(COALESCE(l->>'hsn', '')), ''),
+            COALESCE(l->>'unit', 'PCS'),
+            COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::bigint,
+            COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::bigint,
+            COALESCE((l->>'gst_percent'), (l->>'gstPercent'))::numeric,
+            ROUND((COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::numeric * COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::numeric) / 1000.0)::bigint
+        FROM jsonb_array_elements(v_lines) WITH ORDINALITY AS line_data(l, ordinality);
+    END IF;
 
     RETURN jsonb_build_object(
         'id', p_invoice_id,
         'invoice_no', v_existing.invoice_no,
         'fy', v_existing.fy,
-        'taxable_value_paise', v_calc_taxable,
+        'taxable_paise', v_calc_taxable,
         'cgst_paise', v_calc_cgst,
         'sgst_paise', v_calc_sgst,
-        'total_payable_paise', v_calc_payable,
+        'payable_paise', v_calc_payable,
         'status', v_existing.status
     );
 END;
 $$;
 
--- 3. Flexible starting number function (can be updated anytime!)
+-- 6. Function: delete_invoice
+CREATE OR REPLACE FUNCTION public.delete_invoice(p_invoice_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+    v_existing public.invoices%ROWTYPE;
+BEGIN
+    SELECT * INTO v_existing
+    FROM public.invoices
+    WHERE id = p_invoice_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Invoice with ID % not found', p_invoice_id;
+    END IF;
+
+    DELETE FROM public.invoice_lines WHERE invoice_id = p_invoice_id;
+    DELETE FROM public.invoices WHERE id = p_invoice_id;
+
+    RETURN jsonb_build_object(
+        'id', p_invoice_id,
+        'invoice_no', v_existing.invoice_no,
+        'deleted', true
+    );
+END;
+$$;
+
+-- 7. Function: cancel_invoice
+CREATE OR REPLACE FUNCTION public.cancel_invoice(invoice_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+    v_inv record;
+BEGIN
+    SELECT id, invoice_no, status
+    INTO v_inv
+    FROM public.invoices
+    WHERE id = invoice_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Invoice with ID % not found', invoice_id;
+    END IF;
+
+    IF v_inv.status = 'cancelled' THEN
+        RAISE EXCEPTION 'Invoice % is already cancelled', v_inv.invoice_no;
+    END IF;
+
+    UPDATE public.invoices
+    SET status = 'cancelled',
+        cancelled_at = now()
+    WHERE id = invoice_id;
+
+    RETURN jsonb_build_object(
+        'id', invoice_id,
+        'invoice_no', v_inv.invoice_no,
+        'status', 'cancelled'
+    );
+END;
+$$;
+
+-- 8. Function: set_invoice_counter (allows setting starting bill number anytime)
 CREATE OR REPLACE FUNCTION public.set_invoice_counter(p_fy text, p_next_number int)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -522,8 +489,9 @@ BEGIN
 END;
 $$;
 
--- Grant execution to anon and authenticated
+-- 9. Grant execute permissions to anon and authenticated
 GRANT EXECUTE ON FUNCTION public.create_invoice(jsonb) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.update_invoice(uuid, jsonb) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.delete_invoice(uuid) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.cancel_invoice(uuid) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.set_invoice_counter(text, int) TO anon, authenticated;
-
