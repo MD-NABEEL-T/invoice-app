@@ -325,7 +325,7 @@ export default function MonthlyReportImport() {
             number: item.number,
             fy: item.fy,
             invoice_date: item.invoice_date,
-            status: 'finalized',
+            status: 'final',
             buyer_id: selectedBuyer.id,
             buyer_name: selectedBuyer.name,
             buyer_gstin: selectedBuyer.gstin || '33AAACK4841R1ZA',
@@ -333,7 +333,8 @@ export default function MonthlyReportImport() {
             buyer_address: buyerAddressText,
             delivery_no: item.dc_no,
             delivery_date: item.dc_date,
-            buyer_order_no: item.po_no,
+            despatched_through: 'Road',
+            buyer_order_no: item.po_no || '-',
             buyer_order_date: item.po_date,
             taxable_paise: item.taxable_paise,
             cgst_paise: item.cgst_paise,
@@ -354,11 +355,11 @@ export default function MonthlyReportImport() {
             line_no: 1,
             description: desc,
             hsn: 'MISC',
-            quantity: 1,
             unit: 'LOT',
-            gst_percent: item.gst_percent,
+            qty_milli: 1000,
             rate_paise: item.taxable_paise,
-            taxable_value_paise: item.taxable_paise,
+            gst_percent: item.gst_percent,
+            amount_paise: item.taxable_paise,
           });
           successCount++;
         }

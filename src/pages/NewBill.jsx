@@ -828,7 +828,7 @@ export default function NewBill() {
             buyer_name: header.buyer_name,
             buyer_gstin: header.buyer_gstin,
             buyer_state_code: header.buyer_state_code,
-            buyer_address: header.buyer_address,
+            buyer_address: header.buyer_address || 'MELVISHARAM, TAMIL NADU',
             buyer_order_no: header.buyer_order_no,
             buyer_order_date: header.buyer_order_date,
             delivery_no: header.delivery_no,
@@ -895,12 +895,12 @@ export default function NewBill() {
             number: nextNum,
             fy,
             invoice_date: header.invoice_date,
-            status: 'finalized',
+            status: 'final',
             buyer_id: header.buyer_id,
             buyer_name: header.buyer_name,
             buyer_gstin: header.buyer_gstin,
             buyer_state_code: header.buyer_state_code || '33',
-            buyer_address: header.buyer_address,
+            buyer_address: header.buyer_address || 'MELVISHARAM, TAMIL NADU',
             delivery_no: header.delivery_no || null,
             delivery_date: header.delivery_date || null,
             buyer_order_no: header.buyer_order_no,
@@ -932,7 +932,6 @@ export default function NewBill() {
             rate_paise: ratePaise,
             gst_percent: Number(l.gst_percent),
             amount_paise: lineTotal,
-            taxable_value_paise: lineTotal,
           };
         });
 
