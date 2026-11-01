@@ -526,3 +526,4 @@ $$;
 GRANT EXECUTE ON FUNCTION public.create_invoice(jsonb) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.update_invoice(uuid, jsonb) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.set_invoice_counter(text, int) TO anon, authenticated;
+
