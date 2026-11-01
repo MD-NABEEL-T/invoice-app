@@ -877,7 +877,7 @@ export default function NewBill() {
         console.warn('RPC create_invoice error, using resilient direct table fallback:', error);
 
         // Resilient fallback for create_invoice:
-        const fy = currentFy || '26-27';
+        const fy = derivedFy || (billDate ? financialYear(billDate) : '26-27') || '26-27';
         const { data: counterData } = await supabase
           .from('counters')
           .select('last_number')
