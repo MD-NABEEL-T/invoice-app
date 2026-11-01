@@ -339,32 +339,17 @@ export default function Settings() {
               </span>
             </div>
 
-            {hasBillsInFy ? (
-              <div className="pt-2 border-t border-slate-200 flex items-center space-x-2 text-slate-700">
-                <svg className="w-5 h-5 text-slate-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-                <span className="text-sm font-bold text-slate-800">
-                  Locked because bills have been made
-                </span>
-              </div>
-            ) : (
-              <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <p className="text-xs text-slate-500 font-medium">
-                  No bills created yet in FY {currentFy}. You can change the starting number if needed.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setChangeNumberInput(String(numbering.lastNumber ?? 0));
-                    setShowChangeModal(true);
-                  }}
-                  className="min-h-[48px] px-4 py-2 rounded-xl bg-white border-2 border-blue-600 text-blue-700 font-black text-sm hover:bg-blue-50 active:bg-blue-100 transition shrink-0"
-                >
-                  Change number
-                </button>
-              </div>
-            )}
+            <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <p className="text-xs text-slate-500 font-medium">
+                Want to change your starting number or constant format?
+              </p>
+              <Link
+                to="/settings/numbering"
+                className="min-h-[44px] px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs transition shrink-0 flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <span>Edit Invoice Numbering &rarr;</span>
+              </Link>
+            </div>
           </div>
         ) : (
           /* Series NOT set yet */
