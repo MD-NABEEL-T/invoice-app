@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase.js';
 import { financialYear, paiseToRupees, calcInvoice } from '../lib/tax.js';
 import {
   parseQuantityToMilli,
+  formatMilliToQuantity,
   parseRupeesToPaise,
   validateBillLine,
   validateBillForm,
@@ -133,6 +134,12 @@ export default function NewBill() {
   useEffect(() => {
     let isCancelled = false;
     async function checkLatestBill() {
+      // In edit mode, suppress sequence date warning since bill already has its slot in the sequence
+      if (isEditMode) {
+        setLatestBillWarning(null);
+        return;
+      }
+
       try {
         const { data, error } = await supabase
           .from('invoices')
@@ -1050,18 +1057,37 @@ export default function NewBill() {
   return (
     <div className="space-y-6 pb-28">
       {/* Top Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-            {isEditMode ? `Edit Bill: ${existingInvoice?.invoice_no || ''}` : 'New Bill'}
-          </h2>
-          <p className="text-sm font-semibold text-slate-500">
-            {isEditMode ? (
-              <span>Editing finalized invoice &bull; Financial Year: <span className="font-mono font-bold text-slate-900">{derivedFy}</span></span>
-            ) : (
-              <span>Financial Year: <span className="font-mono font-bold text-slate-900">{derivedFy}</span></span>
-            )}
-          </p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center space-x-3">
+          <button
+            type="button"
+            onClick={() => {
+              if (isEditMode && editBillId) {
+                navigate(`/bills/${editBillId}`);
+              } else {
+                navigate(-1);
+              }
+            }}
+            className="w-10 h-10 rounded-xl bg-white border-2 border-slate-300 hover:bg-slate-100 active:bg-slate-200 text-slate-700 flex items-center justify-center shadow-sm cursor-pointer transition shrink-0"
+            aria-label="Back"
+            title="Go Back"
+          >
+            <svg className="w-5 h-5 stroke-[2.5]" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+          </button>
+          <div>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">
+              {isEditMode ? `Edit Bill: ${existingInvoice?.invoice_no || ''}` : 'New Bill'}
+            </h2>
+            <p className="text-xs sm:text-sm font-semibold text-slate-500">
+              {isEditMode ? (
+                <span>Editing finalized invoice &bull; Financial Year: <span className="font-mono font-bold text-slate-900">{derivedFy}</span></span>
+              ) : (
+                <span>Financial Year: <span className="font-mono font-bold text-slate-900">{derivedFy}</span></span>
+              )}
+            </p>
+          </div>
         </div>
 
         {draftRestored && (
@@ -1715,10 +1741,10 @@ export default function NewBill() {
             type="button"
             onClick={handleInitiateSave}
             disabled={isSaving}
-            className="min-h-[52px] px-6 py-3 rounded-2xl bg-blue-600 text-white font-black text-lg hover:bg-blue-500 active:bg-blue-700 shadow-lg flex items-center space-x-2 transition disabled:opacity-50"
+            className="min-h-[52px] px-6 py-3 rounded-2xl bg-blue-600 text-white font-black text-lg hover:bg-blue-500 active:bg-blue-700 shadow-lg flex items-center space-x-2 transition disabled:opacity-50 cursor-pointer"
           >
-            <span>{isSaving ? 'Saving...' : 'Save Bill'}</span>
-            <svg className="w-5 h-5 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span>{isSaving ? 'Saving...' : isEditMode ? 'Update Bill' : 'Save Bill'}</span>
+            <svg className="w-5 h-5 stroke-[3]" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
           </button>

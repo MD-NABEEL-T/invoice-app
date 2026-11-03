@@ -244,9 +244,10 @@ export default function Home() {
             {invoices.map((inv) => {
               const isCancelled = inv.status === 'cancelled';
               return (
-                <div
+                <Link
                   key={inv.id}
-                  className={`bg-white rounded-2xl border-2 p-4 shadow-sm transition ${
+                  to={`/bills/${inv.id}`}
+                  className={`block bg-white rounded-2xl border-2 p-4 shadow-sm transition hover:border-blue-400 hover:shadow-md active:scale-[0.99] cursor-pointer ${
                     isCancelled ? 'border-red-300 bg-red-50/30' : 'border-slate-300'
                   }`}
                 >
@@ -262,9 +263,14 @@ export default function Home() {
                         </span>
                       )}
                     </div>
-                    <span className="text-sm font-semibold text-slate-600 shrink-0">
-                      {formatDisplayDate(inv.invoice_date)}
-                    </span>
+                    <div className="flex items-center space-x-1.5 text-slate-600">
+                      <span className="text-sm font-semibold">
+                        {formatDisplayDate(inv.invoice_date)}
+                      </span>
+                      <svg className="w-4 h-4 text-slate-400" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
                   </div>
 
                   {/* Middle row: Buyer Name */}
@@ -285,7 +291,7 @@ export default function Home() {
                       {formatRupees(inv.payable_paise)}
                     </span>
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>
