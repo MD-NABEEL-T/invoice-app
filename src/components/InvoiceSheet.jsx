@@ -6,7 +6,7 @@ import {
   paginateInvoiceLines,
 } from '../lib/invoiceLayout.js';
 import { formatMilliToQuantity } from '../lib/billPayload.js';
-import { formatDisplayDate } from '../lib/billUtils.js';
+import { formatDisplayDate, numberToWordsIndian } from '../lib/billUtils.js';
 
 const DEFAULT_FIRM = {
   name: 'KHANSA ENTERPRISES',
@@ -224,11 +224,11 @@ export function InvoicePage({
         )}
 
         {/* 2. Top Section: Firm Profile (Left) and Invoice Metadata (Right) */}
-        <div className="flex shrink-0" style={{ borderBottom: '1px solid #000000' }}>
+        <div className="flex shrink-0" style={{ borderBottom: '1px solid #000000', display: 'flex' }}>
           {/* Left: Firm Profile */}
           <div
             className="w-7/12 p-2.5 flex flex-col justify-between"
-            style={{ borderRight: '1px solid #000000' }}
+            style={{ borderRight: '1px solid #000000', width: '58.333%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
           >
             <div>
               <h2
@@ -260,7 +260,7 @@ export function InvoicePage({
           </div>
 
           {/* Right: Invoice Reference Metadata */}
-          <div className="w-5/12 flex flex-col justify-between text-[10px]">
+          <div className="w-5/12 flex flex-col justify-between text-[10px]" style={{ width: '41.667%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             {/* Invoice No & Date */}
             <div className="flex" style={{ borderBottom: '1px solid #000000' }}>
               <div className="w-1/2 p-1.5" style={{ borderRight: '1px solid #000000' }}>
@@ -312,11 +312,11 @@ export function InvoicePage({
         </div>
 
         {/* 3. Middle Section: Buyer (Left) and Transport/Dispatch (Right) */}
-        <div className="flex shrink-0" style={{ borderBottom: '1px solid #000000' }}>
+        <div className="flex shrink-0" style={{ borderBottom: '1px solid #000000', display: 'flex' }}>
           {/* Left: Buyer Details */}
           <div
             className="w-7/12 p-2.5 flex flex-col justify-between"
-            style={{ borderRight: '1px solid #000000' }}
+            style={{ borderRight: '1px solid #000000', width: '58.333%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
           >
             <div>
               <span
@@ -347,7 +347,7 @@ export function InvoicePage({
           </div>
 
           {/* Right: Transport, Destination & Terms */}
-          <div className="w-5/12 flex flex-col justify-between text-[10px]">
+          <div className="w-5/12 flex flex-col justify-between text-[10px]" style={{ width: '41.667%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div className="p-1.5" style={{ borderBottom: '1px solid #000000' }}>
               <span className="font-bold block" style={{ color: '#4b5563' }}>Despatched through:</span>
               <span className="font-semibold block" style={{ color: '#000000' }}>
@@ -532,7 +532,7 @@ export function InvoicePage({
           >
             <span className="font-bold mr-1" style={{ color: '#4b5563' }}>Amount in words:</span>
             <span className="font-bold uppercase" style={{ color: '#000000' }}>
-              {invoice.amount_in_words || (hsnSummary ? hsnSummary.taxInWords : '')}
+              {invoice.amount_in_words || (invoice.payable_paise != null ? numberToWordsIndian(invoice.payable_paise) : (hsnSummary ? hsnSummary.taxInWords : ''))}
             </span>
           </div>
 

@@ -46,34 +46,66 @@ export async function generateInvoicePdfBlob(pageElements, { scale = 2, jpegQual
       height: 1123,
       windowWidth: 794,
       windowHeight: 1123,
+      x: 0,
+      y: 0,
       scrollX: 0,
       scrollY: 0,
       onclone: async (clonedDoc, clonedEl) => {
-        // 1. Hide all navigation bars, headers, floating bars, and dialogs in the cloned document
-        const nonPrintables = clonedDoc.querySelectorAll('nav, header, footer, .no-print, .fixed, button');
-        nonPrintables.forEach((el) => {
-          el.style.display = 'none';
-          el.style.visibility = 'hidden';
-        });
+        // Copy active document stylesheets into clonedDoc so it never renders unstyled
+        try {
+          const styleTag = clonedDoc.createElement('style');
+          let cssText = '';
+          Array.from(document.styleSheets).forEach((sheet) => {
+            try {
+              Array.from(sheet.cssRules || []).forEach((rule) => {
+                cssText += rule.cssText + '\n';
+              });
+            } catch {
+              // ignore cross-origin
+            }
+          });
+          if (cssText) {
+            styleTag.textContent = cssText;
+            clonedDoc.head.appendChild(styleTag);
+          }
+        } catch {
+          // ignore
+        }
 
-        // 2. Force clonedDoc root and body to exact 794px x 1123px A4 dimensions
+        // 1. Configure clonedDoc body as a clean 794px canvas
+        if (clonedDoc.body) {
+          clonedDoc.body.style.margin = '0';
+          clonedDoc.body.style.padding = '0';
+          clonedDoc.body.style.backgroundColor = '#ffffff';
+          clonedDoc.body.style.overflow = 'visible';
+          clonedDoc.body.style.width = '794px';
+          clonedDoc.body.style.minWidth = '794px';
+        }
         if (clonedDoc.documentElement) {
-          clonedDoc.documentElement.style.width = '794px';
-          clonedDoc.documentElement.style.minWidth = '794px';
           clonedDoc.documentElement.style.margin = '0';
           clonedDoc.documentElement.style.padding = '0';
           clonedDoc.documentElement.style.overflow = 'visible';
-        }
-        if (clonedDoc.body) {
-          clonedDoc.body.style.width = '794px';
-          clonedDoc.body.style.minWidth = '794px';
-          clonedDoc.body.style.margin = '0';
-          clonedDoc.body.style.padding = '0';
-          clonedDoc.body.style.overflow = 'visible';
+          clonedDoc.documentElement.style.width = '794px';
+          clonedDoc.documentElement.style.minWidth = '794px';
         }
 
-        // 3. Unconstrain and reset clonedEl explicitly to exact 794px x 1123px A4 dimensions
-        if (clonedEl && clonedEl.style) {
+        // 2. Hide all other top-level elements so nothing can overlap or interfere
+        if (clonedDoc.body) {
+          Array.from(clonedDoc.body.children).forEach((child) => {
+            if (child !== clonedEl && !child.contains(clonedEl)) {
+              child.style.display = 'none';
+            }
+          });
+        }
+
+        // 3. Move clonedEl to be the direct first child of body at top-left (0, 0)
+        // This isolates it from any parent container positioning, transforms, clipping, or offsets
+        if (clonedEl && clonedDoc.body) {
+          clonedDoc.body.prepend(clonedEl);
+
+          clonedEl.style.position = 'absolute';
+          clonedEl.style.top = '0px';
+          clonedEl.style.left = '0px';
           clonedEl.style.width = '794px';
           clonedEl.style.minWidth = '794px';
           clonedEl.style.maxWidth = '794px';
@@ -82,30 +114,26 @@ export async function generateInvoicePdfBlob(pageElements, { scale = 2, jpegQual
           clonedEl.style.maxHeight = '1123px';
           clonedEl.style.transform = 'none';
           clonedEl.style.margin = '0';
-          clonedEl.style.position = 'relative';
+          clonedEl.style.padding = '0';
+          clonedEl.style.display = 'flex';
+          clonedEl.style.flexDirection = 'column';
+          clonedEl.style.justifyContent = 'space-between';
           clonedEl.style.opacity = '1';
+          clonedEl.style.visibility = 'visible';
+          clonedEl.style.zIndex = '99999';
+          clonedEl.style.boxSizing = 'border-box';
+
+          // Ensure all descendants inside clonedEl are fully visible
+          const allDescendants = clonedEl.querySelectorAll('*');
+          allDescendants.forEach((d) => {
+            d.style.visibility = 'visible';
+            if (d.style.opacity && d.style.opacity !== '1') {
+              d.style.opacity = '1';
+            }
+          });
         }
 
-        // 4. Reset all ancestor containers up to body
-        let cur = clonedEl ? clonedEl.parentElement : null;
-        while (cur && cur !== clonedDoc.body) {
-          if (cur.style) {
-            cur.style.position = 'static';
-            cur.style.left = '0';
-            cur.style.top = '0';
-            cur.style.opacity = '1';
-            cur.style.transform = 'none';
-            cur.style.width = '794px';
-            cur.style.maxWidth = 'none';
-            cur.style.minWidth = '794px';
-            cur.style.overflow = 'visible';
-            cur.style.margin = '0';
-            cur.style.padding = '0';
-          }
-          cur = cur.parentElement;
-        }
-
-        // 5. Ensure all images inside clonedDoc (including logo) are fully decoded
+        // 4. Ensure all images inside clonedDoc are fully decoded before paint
         try {
           const imgs = Array.from(clonedDoc.querySelectorAll('img'));
           await Promise.all(

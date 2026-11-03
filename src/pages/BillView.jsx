@@ -932,19 +932,19 @@ export default function BillView() {
       {/* OFF-SCREEN PDF CONTAINER:
           Renders strictly ONE single clean format without copy labels (Original/Duplicate/etc)
           for html2canvas PDF download and sharing.
-          Positioned off-screen safely so viewport never shifts or breaks.
+          Hidden from user interaction and view, but cleanly present in the DOM for PDF generator.
       */}
       <div
         id="pdf-download-container"
-        className="no-print pointer-events-none select-none"
         aria-hidden="true"
         style={{
           position: 'fixed',
           top: 0,
-          left: '-9999px',
+          left: 0,
           width: '794px',
+          zIndex: -99999,
+          pointerEvents: 'none',
           opacity: 0,
-          zIndex: -9999,
         }}
       >
         {paginatedPages.map((page) => (

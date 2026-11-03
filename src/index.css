@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
   font-size: 18px;
@@ -59,7 +61,7 @@ body {
   }
 
   /* Hide navigation, toolbars, buttons, dialog overlays, and screen-only elements */
-  nav, header, footer, .no-print, button, .app-shell-nav, .fixed, .screen-only {
+  nav, header, footer, .no-print, button, .app-shell-nav, .fixed, .screen-only, #pdf-download-container {
     display: none !important;
     visibility: hidden !important;
     height: 0 !important;
