@@ -70,25 +70,87 @@ export async function requestNotificationPermission() {
 }
 
 /**
+ * Plays an audible notification chime using Web Audio API and audio fallback.
+ * Synthesizes a crisp, pleasant two-tone chime (E5 -> A5) without needing any external audio file.
+ * Works offline with 0 network latency.
+ */
+export function playNotificationChime() {
+  if (typeof window === 'undefined') return;
+
+  // 1. Try HTML Audio element with /notification.wav
+  try {
+    const audio = new Audio('/notification.wav');
+    audio.play().catch(() => {});
+  } catch {
+    // fallback to Web Audio synthesis
+  }
+
+  // 2. Synthesize with Web Audio API for instantaneous chime
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) {
+      const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+
+      // First tone: E5 (659.25 Hz)
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(659.25, ctx.currentTime);
+      gain1.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(ctx.currentTime);
+      osc1.stop(ctx.currentTime + 0.35);
+
+      // Second tone: A5 (880 Hz)
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(880, ctx.currentTime + 0.12);
+      gain2.gain.setValueAtTime(0.35, ctx.currentTime + 0.12);
+      gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.55);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(ctx.currentTime + 0.12);
+      osc2.stop(ctx.currentTime + 0.55);
+    }
+  } catch (err) {
+    console.warn('Audio chime playback notice:', err);
+  }
+}
+
+/**
  * Send a web notification if conditions match.
  * Uses ServiceWorkerRegistration.showNotification first (standard & required on Android / Chrome Mobile / PWA).
+ * Plays an audible notification sound chime and vibrates the device.
  * Falls back to desktop window.Notification constructor.
  */
 export async function sendBrowserNotification(title, options = {}) {
   if (!isPushNotificationSupported()) return false;
   if (Notification.permission !== 'granted') return false;
 
+  // Always play notification chime
+  playNotificationChime();
+
+  const notificationOptions = {
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    sound: '/notification.wav',
+    silent: false,
+    vibrate: [300, 150, 300, 150, 300],
+    ...options,
+  };
+
   // 1. Primary: Use Service Worker registration (Works on Android, Chrome Mobile, iOS 16.4+, and Desktop)
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
     try {
       const reg = await navigator.serviceWorker.ready;
       if (reg && typeof reg.showNotification === 'function') {
-        await reg.showNotification(title, {
-          icon: '/icons/icon-192.png',
-          badge: '/icons/icon-192.png',
-          vibrate: [200, 100, 200],
-          ...options,
-        });
+        await reg.showNotification(title, notificationOptions);
         return true;
       }
     } catch (swErr) {
@@ -99,10 +161,8 @@ export async function sendBrowserNotification(title, options = {}) {
   // 2. Fallback for Desktop browsers without active Service Worker
   try {
     new Notification(title, {
-      icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
       requireInteraction: true,
-      ...options,
+      ...notificationOptions,
     });
     return true;
   } catch (err) {
