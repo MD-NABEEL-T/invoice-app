@@ -137,3 +137,4 @@ function doGet(e) {
   return ContentService.createTextOutput('Khansa Invoices Webhook is Online and Ready!')
     .setMimeType(ContentService.MimeType.TEXT);
 }
+
