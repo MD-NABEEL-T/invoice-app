@@ -114,3 +114,30 @@ export function checkAndNotifyGstReminders() {
   return reminder;
 }
 
+/**
+ * Daily sales notification helper:
+ * Fires a reminder notification if 0 bills have been created today.
+ */
+export function checkAndNotifyDailySales(todayCount) {
+  if (todayCount !== 0) return false;
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayKey = `khansa_no_sales_notified_${todayStr}`;
+
+  try {
+    const alreadyNotified = localStorage.getItem(todayKey);
+    if (!alreadyNotified && isPushNotificationSupported() && Notification.permission === 'granted') {
+      sendBrowserNotification('No Bills Created Today', {
+        body: `Reminder: You have not created any bills yet today (${todayStr}).`,
+        tag: 'daily-sales-reminder',
+      });
+      localStorage.setItem(todayKey, 'true');
+      return true;
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  return false;
+}
+

@@ -6,130 +6,6 @@ import { validateGSTIN } from '../lib/itemValidation.js';
 import { pingDatabase, getLastPingTimestamp } from '../lib/keepAlive.js';
 import { isPushNotificationSupported, requestNotificationPermission, sendBrowserNotification } from '../lib/gstReminders.js';
 
-const GOOGLE_APPS_SCRIPT_CODE = `/**
- * Google Apps Script for Khansa Enterprises GST Invoicing
- * 1. Open https://script.google.com -> New Project
- * 2. Paste this code and Save (Ctrl+S)
- * 3. Click Deploy -> New Deployment -> Select "Web app"
- *    - Execute as: "Me"
- *    - Who has access: "Anyone" (Required)
- * 4. Copy Web App URL into Settings!
- */
-function doPost(e) {
-  try {
-    var raw = e.postData && e.postData.contents ? e.postData.contents : '{}';
-    var data = JSON.parse(raw);
-    var recipient = data.email_to || 'khansaenterprises19@gmail.com';
-
-    if (data.isTest) {
-      MailApp.sendEmail({
-        to: recipient,
-        subject: 'Test Email: Khansa Invoices App Connected Successfully',
-        htmlBody: '<div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">' +
-          '<h2 style="color: #0f172a; margin-top: 0;">Khansa Invoices - Email Connected!</h2>' +
-          '<p>This test email confirms that your Google Apps Script webhook is working perfectly.</p>' +
-          '<p>Recipient: <strong>' + recipient + '</strong></p>' +
-          '<p>Timestamp: <strong>' + new Date().toLocaleString() + '</strong></p>' +
-          '<p style="color: #16a34a; font-weight: bold;">You will now automatically receive every finalized bill copy in your inbox.</p>' +
-          '</div>'
-      });
-      return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    var invoiceNo = data.invoice_no || 'Draft';
-    var action = data.action || 'New Bill Created';
-    var buyerName = data.buyer_name || 'Buyer';
-    var billDate = data.date || '';
-    var payableRupees = data.payable_rupees || '0.00';
-    var words = data.amount_in_words || '';
-    var lines = data.lines || [];
-
-    var rowsHtml = '';
-    for (var i = 0; i < lines.length; i++) {
-      var item = lines[i];
-      rowsHtml += '<tr>' +
-        '<td style="padding: 6px; border: 1px solid #cbd5e1; text-align: center;">' + (i + 1) + '</td>' +
-        '<td style="padding: 6px; border: 1px solid #cbd5e1;">' + (item.description || '') + '</td>' +
-        '<td style="padding: 6px; border: 1px solid #cbd5e1; text-align: center;">' + (item.hsn || '-') + '</td>' +
-        '<td style="padding: 6px; border: 1px solid #cbd5e1; text-align: right;">' + (item.quantity || '') + ' ' + (item.unit || '') + '</td>' +
-        '<td style="padding: 6px; border: 1px solid #cbd5e1; text-align: right;">Rs. ' + (item.rate || '') + '</td>' +
-        '<td style="padding: 6px; border: 1px solid #cbd5e1; text-align: center;">' + (item.gst_percent || '') + '%</td>' +
-        '<td style="padding: 6px; border: 1px solid #cbd5e1; text-align: right; font-weight: bold;">Rs. ' + (item.amount_rupees || '') + '</td>' +
-        '</tr>';
-    }
-
-    var emailHtml = '<div style="font-family: Arial, Calibri, sans-serif; max-width: 650px; color: #1e293b; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">' +
-      '<div style="background-color: #0f172a; color: #ffffff; padding: 16px 20px;">' +
-        '<h2 style="margin: 0; font-size: 18px; font-weight: 800;">KHANSA ENTERPRISES</h2>' +
-        '<p style="margin: 4px 0 0; font-size: 12px; opacity: 0.9;">' + action + ' - Invoice #' + invoiceNo + '</p>' +
-      '</div>' +
-      '<div style="padding: 18px;">' +
-        '<table style="width: 100%; font-size: 12px; margin-bottom: 12px;">' +
-          '<tr>' +
-            '<td style="vertical-align: top; width: 60%;">' +
-              '<strong>Buyer:</strong><br/>' +
-              '<span style="font-size: 13px; font-weight: bold; color: #0f172a;">' + buyerName + '</span><br/>' +
-              (data.buyer_address ? data.buyer_address.replace(/\\n/g, '<br/>') + '<br/>' : '') +
-              (data.buyer_gstin ? '<strong>GSTIN:</strong> ' + data.buyer_gstin : '') +
-            '</td>' +
-            '<td style="vertical-align: top; width: 40%; text-align: right;">' +
-              '<strong>Invoice No:</strong> ' + invoiceNo + '<br/>' +
-              '<strong>Date:</strong> ' + billDate + '<br/>' +
-              (data.buyer_order_no ? '<strong>Buyer Order:</strong> ' + data.buyer_order_no + '<br/>' : '') +
-              (data.delivery_no ? '<strong>Delivery No:</strong> ' + data.delivery_no + '<br/>' : '') +
-            '</td>' +
-          '</tr>' +
-        '</table>' +
-        '<table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 14px;">' +
-          '<thead>' +
-            '<tr style="background-color: #f1f5f9; text-align: left;">' +
-              '<th style="padding: 6px; border: 1px solid #cbd5e1; text-align: center;">#</th>' +
-              '<th style="padding: 6px; border: 1px solid #cbd5e1;">Description</th>' +
-              '<th style="padding: 6px; border: 1px solid #cbd5e1; text-align: center;">HSN</th>' +
-              '<th style="padding: 6px; border: 1px solid #cbd5e1; text-align: right;">Qty</th>' +
-              '<th style="padding: 6px; border: 1px solid #cbd5e1; text-align: right;">Rate</th>' +
-              '<th style="padding: 6px; border: 1px solid #cbd5e1; text-align: center;">Tax</th>' +
-              '<th style="padding: 6px; border: 1px solid #cbd5e1; text-align: right;">Amount</th>' +
-            '</tr>' +
-          '</thead>' +
-          '<tbody>' + rowsHtml + '</tbody>' +
-        '</table>' +
-        '<table style="width: 100%; font-size: 12px; margin-bottom: 12px;">' +
-          '<tr>' +
-            '<td style="width: 55%; vertical-align: top;">' +
-              '<strong>Amount in words:</strong><br/>' + words +
-            '</td>' +
-            '<td style="width: 45%; text-align: right;">' +
-              'Taxable: Rs. ' + (data.taxable_rupees || '0.00') + '<br/>' +
-              'CGST: Rs. ' + (data.cgst_rupees || '0.00') + '<br/>' +
-              'SGST: Rs. ' + (data.sgst_rupees || '0.00') + '<br/>' +
-              '<div style="margin-top: 6px; padding-top: 4px; border-top: 2px solid #0f172a; font-size: 15px; font-weight: bold; color: #0f172a;">' +
-                'Grand Total: Rs. ' + payableRupees +
-              '</div>' +
-            '</td>' +
-          '</tr>' +
-        '</table>' +
-        '<p style="font-size: 10px; color: #64748b; margin-top: 14px; border-top: 1px solid #e2e8f0; padding-top: 8px;">' +
-          'Automated invoice dispatch from Khansa Enterprises GST Invoicing System.' +
-        '</p>' +
-      '</div>' +
-    '</div>';
-
-    MailApp.sendEmail({
-      to: recipient,
-      subject: action + ': Khansa Enterprises - Invoice #' + invoiceNo + ' (' + buyerName + ')',
-      htmlBody: emailHtml
-    });
-
-    return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: error.toString() })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-function doGet(e) {
-  return ContentService.createTextOutput('Khansa Invoices Webhook Online').setMimeType(ContentService.MimeType.TEXT);
-}`;
-
 export default function Settings() {
   const currentFy = financialYear(new Date());
 
@@ -208,20 +84,9 @@ export default function Settings() {
     }
   };
 
-  // Turnkey Google Apps Script Helpers
-  const [copiedScript, setCopiedScript] = useState(false);
+  // Email Notification Test State
   const [sendingTestEmail, setSendingTestEmail] = useState(false);
   const [testEmailMsg, setTestEmailMsg] = useState('');
-
-  const handleCopyScript = async () => {
-    try {
-      await navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_CODE);
-      setCopiedScript(true);
-      setTimeout(() => setCopiedScript(false), 3000);
-    } catch (err) {
-      console.warn('Clipboard copy error:', err);
-    }
-  };
 
   const handleSendTestEmail = async () => {
     if (!webhookUrl || !webhookUrl.trim()) {
@@ -951,7 +816,31 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* CARD 4: EMAIL & GOOGLE APPS SCRIPT AUTOMATION */}
+      {/* CARD 3B: ITEMS CATALOG & DELETION */}
+      <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-3">
+        <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Catalog Management
+            </span>
+            <h3 className="text-xl font-black text-slate-900 mt-0.5">
+              Items Catalog &amp; Deletion
+            </h3>
+          </div>
+          <Link
+            to="/items"
+            className="px-4 py-2 rounded-xl bg-blue-700 text-white font-bold text-xs hover:bg-blue-800 cursor-pointer shadow-sm"
+          >
+            Manage Items &rarr;
+          </Link>
+        </div>
+
+        <p className="text-xs font-medium text-slate-600 leading-relaxed">
+          Add new items, update HSN codes, set usual prices, deactivate items, or permanently delete unused items from your catalog.
+        </p>
+      </div>
+
+      {/* CARD 4: EMAIL NOTIFICATIONS */}
       <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-4">
         <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
           <div>
@@ -1053,33 +942,6 @@ export default function Settings() {
             )}
           </div>
         </form>
-
-        {/* 1-Minute Turnkey Setup Instructions */}
-        <details className="mt-3 pt-3 border-t border-slate-200 group">
-          <summary className="text-xs font-bold text-blue-800 cursor-pointer hover:underline flex items-center justify-between">
-            <span>📖 Need to setup Google Apps Script? (Click for 1-minute instructions &amp; code)</span>
-            <span className="text-xs text-slate-400 group-open:rotate-180 transition-transform">▼</span>
-          </summary>
-          <div className="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-300 text-xs text-slate-700 space-y-2.5">
-            <ol className="list-decimal list-inside space-y-1.5 font-medium leading-relaxed">
-              <li>Open <a href="https://script.google.com/home/start" target="_blank" rel="noreferrer" className="text-blue-700 underline font-bold">script.google.com</a> and click <strong>&quot;New Project&quot;</strong>.</li>
-              <li>Click the button below to copy the ready Google Apps Script. Replace the empty editor code with it and press <strong>Ctrl+S</strong> to save.</li>
-              <li>Click <strong>&quot;Deploy&quot;</strong> (top right) &rarr; <strong>&quot;New deployment&quot;</strong>.</li>
-              <li>Select type <strong>&quot;Web app&quot;</strong>. Set <em>Execute as: &quot;Me&quot;</em> and <em>Who has access: &quot;Anyone&quot;</em> (CRITICAL).</li>
-              <li>Click <strong>Deploy</strong>, grant permission, copy the Web App URL, and paste it in the box above!</li>
-            </ol>
-
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={handleCopyScript}
-                className="px-4 py-2 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 cursor-pointer text-xs"
-              >
-                {copiedScript ? '✓ Copied to Clipboard!' : '📋 Copy Google Apps Script Code'}
-              </button>
-            </div>
-          </div>
-        </details>
       </div>
 
       {/* CARD 5: FREE-TIER SLEEPER PROTECTION (KEEP-ALIVE) */}

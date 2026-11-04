@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getGstReminder } from './gstReminders.js';
+import { getGstReminder, checkAndNotifyDailySales } from './gstReminders.js';
 
 describe('GST Reminders Logic', () => {
   it('returns GSTR-1 reminder on 8th day of month', () => {
@@ -42,6 +42,11 @@ describe('GST Reminders Logic', () => {
     expect(getGstReminder(new Date('2026-11-01T10:00:00'))).toBeNull();
     expect(getGstReminder(new Date('2026-11-15T10:00:00'))).toBeNull();
     expect(getGstReminder(new Date('2026-11-25T10:00:00'))).toBeNull();
+  });
+
+  it('checkAndNotifyDailySales returns false if bills were created today (count > 0)', () => {
+    expect(checkAndNotifyDailySales(3)).toBe(false);
+    expect(checkAndNotifyDailySales(1)).toBe(false);
   });
 });
 

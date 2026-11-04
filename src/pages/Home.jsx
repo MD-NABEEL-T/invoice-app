@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { formatRupees, formatDisplayDate, computeBillStats } from '../lib/billUtils.js';
 import { financialYear, formatInvoiceNo } from '../lib/tax.js';
-import { getGstReminder } from '../lib/gstReminders.js';
+import { getGstReminder, checkAndNotifyDailySales } from '../lib/gstReminders.js';
 
 export default function Home() {
   const currentFy = financialYear(new Date());
@@ -15,6 +15,7 @@ export default function Home() {
   const [errorMsg, setErrorMsg] = useState('');
   const [gstReminder, setGstReminder] = useState(() => getGstReminder());
   const [reminderDismissed, setReminderDismissed] = useState(false);
+  const [dailyDismissed, setDailyDismissed] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -79,6 +80,13 @@ export default function Home() {
   }, [loadData]);
 
   const stats = computeBillStats(invoices);
+
+  // Daily sales reminder notification check (fires once per day if 0 bills created today)
+  useEffect(() => {
+    if (!loading) {
+      checkAndNotifyDailySales(stats.todayCount);
+    }
+  }, [loading, stats.todayCount]);
 
   return (
     <div className="space-y-6">
@@ -173,6 +181,48 @@ export default function Home() {
               onClick={() => setReminderDismissed(true)}
               className="text-slate-500 hover:text-slate-800 font-black text-lg p-1 shrink-0 cursor-pointer"
               aria-label="Dismiss reminder"
+            >
+              &times;
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Daily Sales Reminder Banner (Shown when no bills have been created today) */}
+      {!loading && stats.todayCount === 0 && !dailyDismissed && (
+        <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/90 p-4 shadow-sm text-amber-950 transition">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start space-x-3 min-w-0">
+              <span className="text-2xl mt-0.5 shrink-0" role="img" aria-label="Daily Notice">
+                📋
+              </span>
+              <div className="min-w-0">
+                <div className="flex items-center space-x-2">
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md tracking-wider bg-amber-600 text-white">
+                    Daily Sales
+                  </span>
+                  <h3 className="text-sm sm:text-base font-black truncate">
+                    No Bills Created Today
+                  </h3>
+                </div>
+                <p className="text-xs sm:text-sm font-semibold mt-1 leading-snug text-amber-900">
+                  No invoices have been recorded yet for today ({formatDisplayDate(new Date())}).
+                </p>
+                <div className="mt-2.5">
+                  <Link
+                    to="/new"
+                    className="text-xs font-black px-3.5 py-1.5 rounded-xl bg-amber-700 hover:bg-amber-800 text-white inline-block shadow-sm"
+                  >
+                    + Create Bill Now &rarr;
+                  </Link>
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDailyDismissed(true)}
+              className="text-amber-700 hover:text-amber-950 font-black text-lg p-1 shrink-0 cursor-pointer"
+              aria-label="Dismiss daily notice"
             >
               &times;
             </button>

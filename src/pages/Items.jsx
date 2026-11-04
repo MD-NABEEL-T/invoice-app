@@ -31,6 +31,10 @@ export default function Items() {
   const [hsnWarning, setHsnWarning] = useState(null);
   const [savingItem, setSavingItem] = useState(false);
 
+  // Delete Item State
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [deletingItem, setDeletingItem] = useState(false);
+
   // 1. Fetch Items
   const loadItems = useCallback(async () => {
     setLoading(true);
@@ -153,7 +157,7 @@ export default function Items() {
     }
   };
 
-  // Toggle Item Active (Deactivate, never delete)
+  // Toggle Item Active (Deactivate / Reactivate)
   const toggleItemActive = async (item) => {
     try {
       const nextActive = !item.active;
@@ -166,6 +170,35 @@ export default function Items() {
       await loadItems();
     } catch (err) {
       alert(err.message || 'Could not update item status.');
+    }
+  };
+
+  // Permanent Delete Item
+  const handleDeleteItem = async (item) => {
+    if (!item) return;
+    setDeletingItem(true);
+    try {
+      const { error } = await supabase.from('items').delete().eq('id', item.id);
+      if (error) throw error;
+      setItemToDelete(null);
+      if (itemModal.isOpen && itemModal.id === item.id) {
+        setItemModal({
+          isOpen: false,
+          mode: 'add',
+          id: null,
+          description: '',
+          unit: '',
+          hsn: '',
+          gst_percent: '',
+          usual_rate_rupees: '',
+          verified: false,
+        });
+      }
+      await loadItems();
+    } catch (err) {
+      alert(err.message || 'Error deleting item from catalog.');
+    } finally {
+      setDeletingItem(false);
     }
   };
 
@@ -413,6 +446,17 @@ export default function Items() {
                   >
                     {item.active ? 'Deactivate' : 'Reactivate'}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setItemToDelete(item)}
+                    className="min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-bold text-red-700 bg-red-50 border border-red-300 hover:bg-red-100 flex items-center space-x-1 cursor-pointer"
+                    title="Delete item from catalog"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    <span>Delete</span>
+                  </button>
                 </div>
               </div>
             );
@@ -629,7 +673,19 @@ export default function Items() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex space-x-3 pt-2">
+              <div className="flex items-center space-x-3 pt-2">
+                {itemModal.mode === 'edit' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setItemToDelete({ id: itemModal.id, description: itemModal.description });
+                    }}
+                    className="min-h-[48px] px-4 rounded-xl border-2 border-red-300 bg-red-50 text-red-700 font-bold hover:bg-red-100 cursor-pointer flex items-center space-x-1"
+                  >
+                    <span>🗑️</span>
+                    <span>Delete</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setItemModal({ ...itemModal, isOpen: false })}
@@ -646,6 +702,62 @@ export default function Items() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM DELETE MODAL */}
+      {itemToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border-2 border-slate-900 max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-start justify-between border-b border-slate-200 pb-3">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-red-600">
+                  Confirm Delete
+                </span>
+                <h3 className="text-xl font-black text-slate-900">
+                  Delete Item from Catalog?
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setItemToDelete(null)}
+                className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold flex items-center justify-center cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="space-y-2 text-sm text-slate-700">
+              <p>
+                Are you sure you want to permanently delete:
+              </p>
+              <p className="font-black text-slate-900 bg-slate-100 p-3 rounded-xl border border-slate-200">
+                {itemToDelete.description}
+              </p>
+              <p className="text-xs text-slate-500">
+                This will remove it from item auto-suggestions. Existing finalized invoices that already used this item will not be affected.
+              </p>
+            </div>
+
+            <div className="flex space-x-3 pt-2">
+              <button
+                type="button"
+                disabled={deletingItem}
+                onClick={() => setItemToDelete(null)}
+                className="flex-1 min-h-[48px] rounded-xl border-2 border-slate-300 font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deletingItem}
+                onClick={() => handleDeleteItem(itemToDelete)}
+                className="flex-1 min-h-[48px] rounded-xl bg-red-700 text-white font-bold hover:bg-red-800 disabled:opacity-50 cursor-pointer"
+              >
+                {deletingItem ? 'Deleting...' : 'Yes, Delete Item'}
+              </button>
+            </div>
           </div>
         </div>
       )}
