@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { financialYear, formatInvoiceNo } from '../lib/tax.js';
 import { validateGSTIN } from '../lib/itemValidation.js';
-import { pingDatabase, getLastPingTimestamp } from '../lib/keepAlive.js';
 import { isPushNotificationSupported, requestNotificationPermission, sendBrowserNotification } from '../lib/gstReminders.js';
 import { subscribeToPushNotifications, getPushSubscriptionState } from '../lib/pushSubscription.js';
 import { THEMES, getStoredTheme, applyTheme } from '../lib/theme.js';
@@ -63,126 +62,6 @@ export default function Settings() {
     } catch (e) {
       console.error('Failed to save copy label preference:', e);
     }
-  };
-
-  // Google Apps Script / Email Webhook state
-  const DEFAULT_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwJaT3E_wJbsFgkvBUtc3sH2Lz_kEk3I3fJZNChOaXa46GqGLaNJIXrMn8HaJTSzioJ/exec';
-
-  const [webhookUrl, setWebhookUrl] = useState(() => {
-    try {
-      return (
-        localStorage.getItem('khansa_gsheet_webhook_url') ||
-        import.meta.env.VITE_EMAIL_WEBHOOK_URL ||
-        DEFAULT_WEBHOOK_URL
-      );
-    } catch {
-      return DEFAULT_WEBHOOK_URL;
-    }
-  });
-  const [notificationEmail, setNotificationEmail] = useState(() => {
-    try {
-      return localStorage.getItem('khansa_notification_email') || 'khansaenterprises19@gmail.com';
-    } catch {
-      return 'khansaenterprises19@gmail.com';
-    }
-  });
-  const [webhookStatus, setWebhookStatus] = useState('');
-
-  const handleSaveWebhook = async (e) => {
-    e.preventDefault();
-    try {
-      localStorage.setItem('khansa_gsheet_webhook_url', webhookUrl.trim());
-      localStorage.setItem('khansa_notification_email', notificationEmail.trim());
-
-      // Safely sync to Supabase app_settings so cloud cron runner can access it
-      try {
-        await supabase.from('app_settings').upsert([
-          { key: 'khansa_gsheet_webhook_url', value: webhookUrl.trim(), updated_at: new Date().toISOString() },
-          { key: 'khansa_notification_email', value: notificationEmail.trim(), updated_at: new Date().toISOString() },
-        ]);
-      } catch (dbErr) {
-        // graceful fallback if table not yet created
-      }
-
-      setWebhookStatus('Automation & Email settings saved successfully!');
-      setTimeout(() => setWebhookStatus(''), 4000);
-    } catch (err) {
-      setWebhookStatus(`Failed to save: ${err.message}`);
-    }
-  };
-
-  // Email Notification Test State
-  const [sendingTestEmail, setSendingTestEmail] = useState(false);
-  const [testEmailMsg, setTestEmailMsg] = useState('');
-
-  const handleSendTestEmail = async () => {
-    const activeUrl = webhookUrl.trim() || import.meta.env.VITE_EMAIL_WEBHOOK_URL || DEFAULT_WEBHOOK_URL;
-    if (!activeUrl) {
-      setTestEmailMsg('Notice: Email dispatcher webhook URL is not connected yet.');
-      setTimeout(() => setTestEmailMsg(''), 6000);
-      return;
-    }
-
-    setSendingTestEmail(true);
-    setTestEmailMsg('');
-    try {
-      await fetch(activeUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({
-          action: 'Test Invoice Delivery',
-          invoice_no: 'TEST-001',
-          date: new Date().toISOString().slice(0, 10),
-          buyer_name: 'KH EXPORT INDIA PVT LTD (Test)',
-          buyer_address: 'MELVISHARAM, TAMIL NADU',
-          buyer_gstin: '33AABCK1234F1Z5',
-          buyer_state: 'Tamil Nadu',
-          buyer_state_code: '33',
-          taxable_rupees: '1000.00',
-          cgst_rupees: '25.00',
-          sgst_rupees: '25.00',
-          payable_rupees: '1050.00',
-          amount_in_words: 'INR One Thousand Fifty Only',
-          email_to: notificationEmail.trim() || 'khansaenterprises19@gmail.com',
-          lines: [
-            {
-              description: 'System Verification Sample Item',
-              hsn: '4107',
-              quantity: '10',
-              unit: 'PCS',
-              rate: '100',
-              amount_rupees: '1000.00',
-            },
-          ],
-        }),
-      });
-      setTestEmailMsg(`Test email with PDF invoice dispatched to ${notificationEmail.trim()}! Please check your inbox.`);
-      setTimeout(() => setTestEmailMsg(''), 6000);
-    } catch (err) {
-      setTestEmailMsg(`Error triggering test email: ${err.message}`);
-    } finally {
-      setSendingTestEmail(false);
-    }
-  };
-
-  // Sleeper Protection / Keep-Alive State
-  const [lastPingTime, setLastPingTime] = useState(() => getLastPingTimestamp());
-  const [pingingDb, setPingingDb] = useState(false);
-  const [pingResult, setPingResult] = useState('');
-
-  const handlePingDb = async () => {
-    setPingingDb(true);
-    setPingResult('');
-    const res = await pingDatabase();
-    setPingingDb(false);
-    if (res.success) {
-      setLastPingTime(res.timestamp);
-      setPingResult(`Database is Active! Ping responded in ${res.durationMs}ms.`);
-    } else {
-      setPingResult(`Ping failed: ${res.error}`);
-    }
-    setTimeout(() => setPingResult(''), 5000);
   };
 
   // Web Push Notification State
@@ -982,143 +861,7 @@ export default function Settings() {
         </p>
       </div>
 
-      {/* CARD 4: EMAIL NOTIFICATIONS */}
-      <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-4">
-        <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
-          <div>
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Email Notifications
-            </span>
-            <h3 className="text-xl font-black text-slate-900 mt-0.5">
-              Invoice Delivery Email
-            </h3>
-          </div>
-          <span className="text-xs font-black uppercase px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300">
-            ✓ Connected
-          </span>
-        </div>
-
-        <p className="text-xs font-medium text-slate-600 leading-relaxed">
-          Whenever a bill is finalized or edited, an automated copy with an attached A4 PDF invoice is automatically emailed directly to your registered business email address.
-        </p>
-
-        {webhookStatus && (
-          <div className="p-3 bg-emerald-50 border border-emerald-400 rounded-xl text-xs font-bold text-emerald-950">
-            {webhookStatus}
-          </div>
-        )}
-
-        {testEmailMsg && (
-          <div className="p-3 bg-blue-50 border border-blue-400 rounded-xl text-xs font-bold text-blue-950">
-            {testEmailMsg}
-          </div>
-        )}
-
-        <form onSubmit={handleSaveWebhook} className="space-y-3.5">
-          <div>
-            <label htmlFor="notificationEmailInput" className="block text-sm font-bold text-slate-900 mb-1">
-              Recipient Email Address
-            </label>
-            <input
-              id="notificationEmailInput"
-              type="email"
-              value={notificationEmail}
-              onChange={(e) => setNotificationEmail(e.target.value)}
-              placeholder="khansaenterprises19@gmail.com"
-              className="w-full min-h-[48px] px-4 py-2.5 rounded-xl border-2 border-slate-400 bg-white text-slate-900 text-sm focus:border-slate-900 font-semibold"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <button
-              type="submit"
-              className="min-h-[44px] px-5 py-2 rounded-xl btn-brand text-white font-bold text-sm shadow-sm cursor-pointer"
-            >
-              Save Email Address
-            </button>
-
-            <button
-              type="button"
-              disabled={sendingTestEmail}
-              onClick={handleSendTestEmail}
-              className="min-h-[44px] px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 disabled:opacity-40 cursor-pointer flex items-center space-x-1.5"
-            >
-              <span>{sendingTestEmail ? 'Sending Test...' : '✉️ Send Test Email'}</span>
-            </button>
-          </div>
-
-          {/* Hidden/Collapsed Advanced Webhook URL for Developer / Admin Only */}
-          <details className="mt-4 pt-3 border-t border-slate-200 group text-xs text-slate-600">
-            <summary className="font-semibold text-slate-500 cursor-pointer hover:text-slate-800 flex items-center justify-between py-1">
-              <span>⚙️ Advanced: Email Dispatch Webhook URL (Developer / Admin)</span>
-              <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
-            </summary>
-            <div className="mt-3 space-y-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
-              <label htmlFor="webhookUrlInput" className="block text-xs font-bold text-slate-700">
-                Google Apps Script Dispatcher URL
-              </label>
-              <input
-                id="webhookUrlInput"
-                type="url"
-                value={webhookUrl}
-                onChange={(e) => setWebhookUrl(e.target.value)}
-                placeholder="https://script.google.com/macros/s/.../exec"
-                className="w-full min-h-[42px] px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-800 text-xs font-mono"
-              />
-              <p className="text-[11px] text-slate-500 leading-normal">
-                Leave blank to use environment default, or paste a deployed Apps Script URL to route bill notifications through custom Gmail.
-              </p>
-            </div>
-          </details>
-        </form>
-      </div>
-
-      {/* CARD 5: FREE-TIER SLEEPER PROTECTION (KEEP-ALIVE) */}
-      <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-4">
-        <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
-          <div>
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Backend Reliability
-            </span>
-            <h3 className="text-xl font-black text-slate-900 mt-0.5">
-              Database Keep-Alive &amp; Sleeper Protection
-            </h3>
-          </div>
-          <span className="text-xs font-black uppercase px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300">
-            ✓ 24/7 Active
-          </span>
-        </div>
-
-        <p className="text-xs font-medium text-slate-600 leading-relaxed">
-          Supabase free-tier databases normally sleep after 7 days of inactivity. This app has two active safeguards: an automated GitHub Actions cron job running twice daily (at 04:00 and 16:00 UTC) and in-app keep-alive pings that keep your database awake 24/7 without interruption.
-        </p>
-
-        {pingResult && (
-          <div className="p-3 bg-blue-50 border border-blue-400 rounded-xl text-xs font-bold text-blue-950">
-            {pingResult}
-          </div>
-        )}
-
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs">
-          <div>
-            <span className="font-bold text-slate-700 block">Last Active Database Ping:</span>
-            <span className="font-mono text-slate-900 font-bold">
-              {lastPingTime ? new Date(lastPingTime).toLocaleString() : 'Active (on load)'}
-            </span>
-          </div>
-
-          <button
-            type="button"
-            disabled={pingingDb}
-            onClick={handlePingDb}
-            className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 disabled:opacity-50 cursor-pointer self-start sm:self-auto"
-          >
-            {pingingDb ? 'Pinging...' : '⚡ Ping Database Now'}
-          </button>
-        </div>
-      </div>
-
-      {/* CARD 6: AUTOMATIC 10:00 PM DAILY SALES NOTIFICATION & GST REMINDERS */}
+      {/* CARD 4: AUTOMATIC 10:00 PM DAILY SALES NOTIFICATION & GST REMINDERS */}
       <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-4">
         <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
           <div>
@@ -1209,7 +952,7 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* CARD 7: DATA SAFETY & COMPLETE OFFLINE BACKUP (Requirement 4) */}
+      {/* CARD 5: DATA SAFETY & COMPLETE OFFLINE BACKUP */}
       <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-4">
         <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
           <div>
