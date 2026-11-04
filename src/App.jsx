@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import AppShell from './components/AppShell.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import Home from './pages/Home.jsx';
 import NewBill from './pages/NewBill.jsx';
 import Bills from './pages/Bills.jsx';
@@ -31,9 +32,10 @@ export default function App() {
   }, []);
 
   return (
-    <BrowserRouter>
-      <PwaUpdateBanner />
-      <Routes>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <PwaUpdateBanner />
+        <Routes>
         {/* Main App Routes inside AppShell - completely open without login */}
         <Route path="/" element={<AppShell />}>
           <Route index element={<Home />} />
@@ -70,5 +72,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
-  );
+  </ErrorBoundary>
+);
 }

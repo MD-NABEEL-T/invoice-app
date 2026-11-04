@@ -3,14 +3,23 @@ import { paiseToRupees, amountInWords } from './tax.js';
 export { amountInWords as numberToWordsIndian };
 
 /**
- * Formats an ISO date string (YYYY-MM-DD) into DD/MM/YYYY for bill display.
+ * Formats an ISO date string (YYYY-MM-DD) or Date object into DD/MM/YYYY for bill display.
+ * Always returns a string, never an object.
  */
-export function formatDisplayDate(dateStr) {
-  if (!dateStr) return '';
-  const parts = String(dateStr).split('T')[0].split('-');
-  if (parts.length !== 3) return dateStr;
+export function formatDisplayDate(dateInput) {
+  if (!dateInput) return '';
+  if (dateInput instanceof Date) {
+    if (isNaN(dateInput.getTime())) return '';
+    const day = String(dateInput.getDate()).padStart(2, '0');
+    const month = String(dateInput.getMonth() + 1).padStart(2, '0');
+    const year = dateInput.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+  const str = String(dateInput).trim();
+  const parts = str.split('T')[0].split('-');
+  if (parts.length !== 3) return str;
   const [year, month, day] = parts;
-  return `${day}/${month}/${year}`;
+  return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
 }
 
 /**

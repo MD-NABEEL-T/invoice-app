@@ -12,9 +12,18 @@ describe('billUtils', () => {
       expect(formatDisplayDate('2026-10-20T12:00:00Z')).toBe('20/10/2026');
     });
 
-    it('returns empty string for null or empty input', () => {
+    it('formats JavaScript Date objects into DD/MM/YYYY string without returning an object', () => {
+      const d = new Date(2026, 10, 4); // Nov 4, 2026
+      const res = formatDisplayDate(d);
+      expect(typeof res).toBe('string');
+      expect(res).toBe('04/11/2026');
+    });
+
+    it('returns empty string for null, undefined or empty input', () => {
       expect(formatDisplayDate(null)).toBe('');
+      expect(formatDisplayDate(undefined)).toBe('');
       expect(formatDisplayDate('')).toBe('');
+      expect(formatDisplayDate(new Date('invalid-date'))).toBe('');
     });
   });
 
