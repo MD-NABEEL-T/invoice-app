@@ -228,7 +228,6 @@ async function runTest() {
       try {
         await supabase.from('invoice_lines').delete().eq('invoice_id', testInvoiceId);
         await supabase.from('invoices').delete().eq('id', testInvoiceId);
-        await supabase.from('counters').upsert({ fy: '26-27', last_number: 0 });
         console.log('Cleanup completed.');
       } catch (e) {
         console.warn('Cleanup error:', e);
