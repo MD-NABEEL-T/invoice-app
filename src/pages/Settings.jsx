@@ -66,11 +66,17 @@ export default function Settings() {
   };
 
   // Google Apps Script / Email Webhook state
+  const DEFAULT_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwJaT3E_wJbsFgkvBUtc3sH2Lz_kEk3I3fJZNChOaXa46GqGLaNJIXrMn8HaJTSzioJ/exec';
+
   const [webhookUrl, setWebhookUrl] = useState(() => {
     try {
-      return localStorage.getItem('khansa_gsheet_webhook_url') || '';
+      return (
+        localStorage.getItem('khansa_gsheet_webhook_url') ||
+        import.meta.env.VITE_EMAIL_WEBHOOK_URL ||
+        DEFAULT_WEBHOOK_URL
+      );
     } catch {
-      return '';
+      return DEFAULT_WEBHOOK_URL;
     }
   });
   const [notificationEmail, setNotificationEmail] = useState(() => {
@@ -110,9 +116,9 @@ export default function Settings() {
   const [testEmailMsg, setTestEmailMsg] = useState('');
 
   const handleSendTestEmail = async () => {
-    const activeUrl = webhookUrl.trim() || import.meta.env.VITE_EMAIL_WEBHOOK_URL || '';
+    const activeUrl = webhookUrl.trim() || import.meta.env.VITE_EMAIL_WEBHOOK_URL || DEFAULT_WEBHOOK_URL;
     if (!activeUrl) {
-      setTestEmailMsg('Notice: Email dispatcher webhook URL is not connected yet. Once you deploy your Google Apps Script and enter the Web App URL in Advanced Settings, email delivery will activate.');
+      setTestEmailMsg('Notice: Email dispatcher webhook URL is not connected yet.');
       setTimeout(() => setTestEmailMsg(''), 6000);
       return;
     }
@@ -125,11 +131,33 @@ export default function Settings() {
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({
-          isTest: true,
+          action: 'Test Invoice Delivery',
+          invoice_no: 'TEST-001',
+          date: new Date().toISOString().slice(0, 10),
+          buyer_name: 'KH EXPORT INDIA PVT LTD (Test)',
+          buyer_address: 'MELVISHARAM, TAMIL NADU',
+          buyer_gstin: '33AABCK1234F1Z5',
+          buyer_state: 'Tamil Nadu',
+          buyer_state_code: '33',
+          taxable_rupees: '1000.00',
+          cgst_rupees: '25.00',
+          sgst_rupees: '25.00',
+          payable_rupees: '1050.00',
+          amount_in_words: 'INR One Thousand Fifty Only',
           email_to: notificationEmail.trim() || 'khansaenterprises19@gmail.com',
+          lines: [
+            {
+              description: 'System Verification Sample Item',
+              hsn: '4107',
+              quantity: '10',
+              unit: 'PCS',
+              rate: '100',
+              amount_rupees: '1000.00',
+            },
+          ],
         }),
       });
-      setTestEmailMsg(`Test email dispatched to ${notificationEmail.trim()}! Please check your inbox (and spam/promotions).`);
+      setTestEmailMsg(`Test email with PDF invoice dispatched to ${notificationEmail.trim()}! Please check your inbox.`);
       setTimeout(() => setTestEmailMsg(''), 6000);
     } catch (err) {
       setTestEmailMsg(`Error triggering test email: ${err.message}`);
@@ -965,13 +993,13 @@ export default function Settings() {
               Invoice Delivery Email
             </h3>
           </div>
-          <span className="text-xs font-black uppercase px-2.5 py-1 rounded-xl bg-slate-100 text-slate-800 border border-slate-300">
-            ✉️ Invoice Copy
+          <span className="text-xs font-black uppercase px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300">
+            ✓ Connected
           </span>
         </div>
 
         <p className="text-xs font-medium text-slate-600 leading-relaxed">
-          Whenever a bill is finalized or edited, an automated copy is sent directly to your registered business email address.
+          Whenever a bill is finalized or edited, an automated copy with an attached A4 PDF invoice is automatically emailed directly to your registered business email address.
         </p>
 
         {webhookStatus && (

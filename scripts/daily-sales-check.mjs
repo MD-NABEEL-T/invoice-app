@@ -134,8 +134,11 @@ async function runDailySalesCheck() {
     console.warn('[Daily 10 PM Check] Push dispatch notice:', err.message);
   }
 
-  // 2. Send Email via Google Apps Script Webhook if configured in app_settings or env
-  let webhookUrl = env.GSHEET_WEBHOOK_URL || '';
+  // 2. Send Email via Google Apps Script Webhook if configured in app_settings, env, or default
+  let webhookUrl =
+    env.GSHEET_WEBHOOK_URL ||
+    env.VITE_EMAIL_WEBHOOK_URL ||
+    'https://script.google.com/macros/s/AKfycbwJaT3E_wJbsFgkvBUtc3sH2Lz_kEk3I3fJZNChOaXa46GqGLaNJIXrMn8HaJTSzioJ/exec';
   try {
     const { data: settingRow } = await supabase
       .from('app_settings')

@@ -30,7 +30,7 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_-rJWi_MtK66PVNOoacl1_g_qKSUBEIh' }}
           VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY || 'BP6nRYXoL5a-C6UYDP0aZsCRIlPq9J6NemBODwKZIozvuia0R7Q2dpUdnQXD8Z79N5m_EE1z_8TIqhJ-2p4NsKU' }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY || 'GHx8v6-RcW8vcFKKfsdevjNLzNQOjfN_O4BB4k-H6bM' }}
-          GSHEET_WEBHOOK_URL: ${{ secrets.GSHEET_WEBHOOK_URL }}
+          GSHEET_WEBHOOK_URL: ${{ secrets.GSHEET_WEBHOOK_URL || 'https://script.google.com/macros/s/AKfycbwJaT3E_wJbsFgkvBUtc3sH2Lz_kEk3I3fJZNChOaXa46GqGLaNJIXrMn8HaJTSzioJ/exec' }}
         run: node scripts/daily-sales-check.mjs
 
       - name: Fallback Direct Keep-Alive Ping
