@@ -1249,11 +1249,34 @@ export default function Settings() {
       </div>
 
       {/* App Version Info Footer */}
-      <div className="pt-4 pb-2 text-center text-xs font-semibold text-slate-500">
+      <div className="pt-4 pb-2 text-center text-xs font-semibold text-slate-500 space-y-2">
         <p>Khansa Enterprises &bull; GST Invoicing App</p>
-        <p className="font-mono text-xs text-slate-600 mt-1">
+        <p className="font-mono text-xs text-slate-600">
           App version: <span className="font-bold text-slate-900 bg-slate-200 px-2 py-0.5 rounded">{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'}</span>
         </p>
+        <div>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                if ('serviceWorker' in navigator) {
+                  const regs = await navigator.serviceWorker.getRegistrations();
+                  for (const r of regs) await r.update();
+                }
+                if ('caches' in window) {
+                  const keys = await caches.keys();
+                  await Promise.all(keys.map((k) => caches.delete(k)));
+                }
+              } catch (e) {
+                // ignore
+              }
+              window.location.reload();
+            }}
+            className="text-[11px] font-bold text-blue-700 hover:text-blue-900 underline bg-white px-3 py-1 rounded-lg border border-slate-300 shadow-xs cursor-pointer inline-flex items-center space-x-1"
+          >
+            <span>🔄 Reload Latest Version &amp; Clear Cache</span>
+          </button>
+        </div>
       </div>
     </div>
   );
