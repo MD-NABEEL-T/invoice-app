@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import AppShell from './components/AppShell.jsx';
 import Home from './pages/Home.jsx';
@@ -14,6 +14,8 @@ import ItemImport from './pages/ItemImport.jsx';
 import MonthlyReportImport from './pages/MonthlyReportImport.jsx';
 import NumberingSettings from './pages/NumberingSettings.jsx';
 import PwaUpdateBanner from './components/PwaUpdateBanner.jsx';
+import { initKeepAlive } from './lib/keepAlive.js';
+import { checkAndNotifyGstReminders } from './lib/gstReminders.js';
 
 // Dev-only route for fixture and print layout testing (excluded in production build)
 const DevPrintSample = import.meta.env.DEV
@@ -21,6 +23,13 @@ const DevPrintSample = import.meta.env.DEV
   : null;
 
 export default function App() {
+  useEffect(() => {
+    // 1. Sleeper protection: ping database so Supabase never auto-pauses
+    initKeepAlive();
+    // 2. GST Reminders: check for 8th & 19th monthly reminders
+    checkAndNotifyGstReminders();
+  }, []);
+
   return (
     <BrowserRouter>
       <PwaUpdateBanner />

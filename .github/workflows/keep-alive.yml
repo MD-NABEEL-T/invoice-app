@@ -1,0 +1,25 @@
+name: Supabase Keep-Alive Ping
+
+on:
+  schedule:
+    # Runs twice every day (at 04:00 UTC and 16:00 UTC) to prevent Supabase from pausing after 7 days
+    - cron: '0 4,16 * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions UI
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase Database
+        run: |
+          echo "Pinging Supabase at https://rgphmteuhxxkqnoharvz.supabase.co to keep database active..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: sb_publishable_-rJWi_MtK66PVNOoacl1_g_qKSUBEIh" \
+            -H "Authorization: Bearer sb_publishable_-rJWi_MtK66PVNOoacl1_g_qKSUBEIh" \
+            "https://rgphmteuhxxkqnoharvz.supabase.co/rest/v1/counters?select=fy&limit=1")
+          echo "HTTP Response Status: $STATUS"
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
+            echo "Keep-alive ping successful. Supabase database is active."
+          else
+            echo "Warning: Received HTTP $STATUS"
+          fi

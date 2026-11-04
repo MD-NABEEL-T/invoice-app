@@ -75,14 +75,15 @@ describe('billPayload helpers', () => {
       expect(res.warning).toMatch(/not 4, 6, or 8 digits/);
     });
 
-    it('validates required header fields in validateBillForm', () => {
+    it('validates required header fields in validateBillForm (despatched_through is optional)', () => {
       const emptyForm = validateBillForm({ header: {}, lines: [] });
       expect(emptyForm.isValid).toBe(false);
       expect(emptyForm.errors).toContain('Buyer selection is required');
       expect(emptyForm.errors).toContain('Branch delivery address is required');
       expect(emptyForm.errors).toContain('Bill date is required');
       expect(emptyForm.errors).toContain('Buyer Order No is required');
-      expect(emptyForm.errors).toContain('Despatched Through is required');
+      // Despatched Through is now optional
+      expect(emptyForm.errors).not.toContain('Despatched Through is required');
       expect(emptyForm.errors).toContain('Add at least one line item');
     });
   });

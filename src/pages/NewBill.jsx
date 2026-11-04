@@ -763,7 +763,10 @@ export default function NewBill() {
       // Webhook dispatch helper for email and Google Sheets automation
       const sendBillEmailWebhook = (invoiceNo, isEdit = false) => {
         const webhookUrl = localStorage.getItem('khansa_gsheet_webhook_url');
-        if (!webhookUrl) return;
+        if (!webhookUrl) {
+          console.info('Google Apps Script Webhook URL not configured in Settings; email notification skipped.');
+          return;
+        }
 
         const emailTo = localStorage.getItem('khansa_notification_email') || 'khansaenterprises19@gmail.com';
         const emailPayload = {
@@ -809,10 +812,11 @@ export default function NewBill() {
         };
 
         try {
+          // Use text/plain with no-cors to prevent CORS preflight block with Google Apps Script
           fetch(webhookUrl, {
             method: 'POST',
             mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify(emailPayload),
           }).catch((e) => console.warn('Webhook dispatch error:', e));
         } catch (e) {
@@ -1315,14 +1319,13 @@ export default function NewBill() {
           </div>
         </div>
 
-        {/* Despatched Through */}
+        {/* Despatched Through (Optional) */}
         <div>
           <label className="block text-base font-bold text-slate-900 mb-1">
-            Despatched Through *
+            Despatched Through (Optional)
           </label>
           <input
             type="text"
-            required
             value={despatchedThrough}
             onChange={(e) => setDespatchedThrough(e.target.value)}
             placeholder="e.g. Direct Delivery / Tempo"

@@ -3,6 +3,132 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { financialYear, formatInvoiceNo } from '../lib/tax.js';
 import { validateGSTIN } from '../lib/itemValidation.js';
+import { pingDatabase, getLastPingTimestamp } from '../lib/keepAlive.js';
+import { isPushNotificationSupported, requestNotificationPermission, sendBrowserNotification } from '../lib/gstReminders.js';
+
+const GOOGLE_APPS_SCRIPT_CODE = `/**
+ * Google Apps Script for Khansa Enterprises GST Invoicing
+ * 1. Open https://script.google.com -> New Project
+ * 2. Paste this code and Save (Ctrl+S)
+ * 3. Click Deploy -> New Deployment -> Select "Web app"
+ *    - Execute as: "Me"
+ *    - Who has access: "Anyone" (Required)
+ * 4. Copy Web App URL into Settings!
+ */
+function doPost(e) {
+  try {
+    var raw = e.postData && e.postData.contents ? e.postData.contents : '{}';
+    var data = JSON.parse(raw);
+    var recipient = data.email_to || 'khansaenterprises19@gmail.com';
+
+    if (data.isTest) {
+      MailApp.sendEmail({
+        to: recipient,
+        subject: 'Test Email: Khansa Invoices App Connected Successfully',
+        htmlBody: '<div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">' +
+          '<h2 style="color: #0f172a; margin-top: 0;">Khansa Invoices - Email Connected!</h2>' +
+          '<p>This test email confirms that your Google Apps Script webhook is working perfectly.</p>' +
+          '<p>Recipient: <strong>' + recipient + '</strong></p>' +
+          '<p>Timestamp: <strong>' + new Date().toLocaleString() + '</strong></p>' +
+          '<p style="color: #16a34a; font-weight: bold;">You will now automatically receive every finalized bill copy in your inbox.</p>' +
+          '</div>'
+      });
+      return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var invoiceNo = data.invoice_no || 'Draft';
+    var action = data.action || 'New Bill Created';
+    var buyerName = data.buyer_name || 'Buyer';
+    var billDate = data.date || '';
+    var payableRupees = data.payable_rupees || '0.00';
+    var words = data.amount_in_words || '';
+    var lines = data.lines || [];
+
+    var rowsHtml = '';
+    for (var i = 0; i < lines.length; i++) {
+      var item = lines[i];
+      rowsHtml += '<tr>' +
+        '<td style="padding: 6px; border: 1px solid #cbd5e1; text-align: center;">' + (i + 1) + '</td>' +
+        '<td style="padding: 6px; border: 1px solid #cbd5e1;">' + (item.description || '') + '</td>' +
+        '<td style="padding: 6px; border: 1px solid #cbd5e1; text-align: center;">' + (item.hsn || '-') + '</td>' +
+        '<td style="padding: 6px; border: 1px solid #cbd5e1; text-align: right;">' + (item.quantity || '') + ' ' + (item.unit || '') + '</td>' +
+        '<td style="padding: 6px; border: 1px solid #cbd5e1; text-align: right;">Rs. ' + (item.rate || '') + '</td>' +
+        '<td style="padding: 6px; border: 1px solid #cbd5e1; text-align: center;">' + (item.gst_percent || '') + '%</td>' +
+        '<td style="padding: 6px; border: 1px solid #cbd5e1; text-align: right; font-weight: bold;">Rs. ' + (item.amount_rupees || '') + '</td>' +
+        '</tr>';
+    }
+
+    var emailHtml = '<div style="font-family: Arial, Calibri, sans-serif; max-width: 650px; color: #1e293b; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">' +
+      '<div style="background-color: #0f172a; color: #ffffff; padding: 16px 20px;">' +
+        '<h2 style="margin: 0; font-size: 18px; font-weight: 800;">KHANSA ENTERPRISES</h2>' +
+        '<p style="margin: 4px 0 0; font-size: 12px; opacity: 0.9;">' + action + ' - Invoice #' + invoiceNo + '</p>' +
+      '</div>' +
+      '<div style="padding: 18px;">' +
+        '<table style="width: 100%; font-size: 12px; margin-bottom: 12px;">' +
+          '<tr>' +
+            '<td style="vertical-align: top; width: 60%;">' +
+              '<strong>Buyer:</strong><br/>' +
+              '<span style="font-size: 13px; font-weight: bold; color: #0f172a;">' + buyerName + '</span><br/>' +
+              (data.buyer_address ? data.buyer_address.replace(/\\n/g, '<br/>') + '<br/>' : '') +
+              (data.buyer_gstin ? '<strong>GSTIN:</strong> ' + data.buyer_gstin : '') +
+            '</td>' +
+            '<td style="vertical-align: top; width: 40%; text-align: right;">' +
+              '<strong>Invoice No:</strong> ' + invoiceNo + '<br/>' +
+              '<strong>Date:</strong> ' + billDate + '<br/>' +
+              (data.buyer_order_no ? '<strong>Buyer Order:</strong> ' + data.buyer_order_no + '<br/>' : '') +
+              (data.delivery_no ? '<strong>Delivery No:</strong> ' + data.delivery_no + '<br/>' : '') +
+            '</td>' +
+          '</tr>' +
+        '</table>' +
+        '<table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 14px;">' +
+          '<thead>' +
+            '<tr style="background-color: #f1f5f9; text-align: left;">' +
+              '<th style="padding: 6px; border: 1px solid #cbd5e1; text-align: center;">#</th>' +
+              '<th style="padding: 6px; border: 1px solid #cbd5e1;">Description</th>' +
+              '<th style="padding: 6px; border: 1px solid #cbd5e1; text-align: center;">HSN</th>' +
+              '<th style="padding: 6px; border: 1px solid #cbd5e1; text-align: right;">Qty</th>' +
+              '<th style="padding: 6px; border: 1px solid #cbd5e1; text-align: right;">Rate</th>' +
+              '<th style="padding: 6px; border: 1px solid #cbd5e1; text-align: center;">Tax</th>' +
+              '<th style="padding: 6px; border: 1px solid #cbd5e1; text-align: right;">Amount</th>' +
+            '</tr>' +
+          '</thead>' +
+          '<tbody>' + rowsHtml + '</tbody>' +
+        '</table>' +
+        '<table style="width: 100%; font-size: 12px; margin-bottom: 12px;">' +
+          '<tr>' +
+            '<td style="width: 55%; vertical-align: top;">' +
+              '<strong>Amount in words:</strong><br/>' + words +
+            '</td>' +
+            '<td style="width: 45%; text-align: right;">' +
+              'Taxable: Rs. ' + (data.taxable_rupees || '0.00') + '<br/>' +
+              'CGST: Rs. ' + (data.cgst_rupees || '0.00') + '<br/>' +
+              'SGST: Rs. ' + (data.sgst_rupees || '0.00') + '<br/>' +
+              '<div style="margin-top: 6px; padding-top: 4px; border-top: 2px solid #0f172a; font-size: 15px; font-weight: bold; color: #0f172a;">' +
+                'Grand Total: Rs. ' + payableRupees +
+              '</div>' +
+            '</td>' +
+          '</tr>' +
+        '</table>' +
+        '<p style="font-size: 10px; color: #64748b; margin-top: 14px; border-top: 1px solid #e2e8f0; padding-top: 8px;">' +
+          'Automated invoice dispatch from Khansa Enterprises GST Invoicing System.' +
+        '</p>' +
+      '</div>' +
+    '</div>';
+
+    MailApp.sendEmail({
+      to: recipient,
+      subject: action + ': Khansa Enterprises - Invoice #' + invoiceNo + ' (' + buyerName + ')',
+      htmlBody: emailHtml
+    });
+
+    return ContentService.createTextOutput(JSON.stringify({ status: 'ok' })).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: error.toString() })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+function doGet(e) {
+  return ContentService.createTextOutput('Khansa Invoices Webhook Online').setMimeType(ContentService.MimeType.TEXT);
+}`;
 
 export default function Settings() {
   const currentFy = financialYear(new Date());
@@ -79,6 +205,147 @@ export default function Settings() {
       setTimeout(() => setWebhookStatus(''), 4000);
     } catch (err) {
       setWebhookStatus(`Failed to save: ${err.message}`);
+    }
+  };
+
+  // Turnkey Google Apps Script Helpers
+  const [copiedScript, setCopiedScript] = useState(false);
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
+  const [testEmailMsg, setTestEmailMsg] = useState('');
+
+  const handleCopyScript = async () => {
+    try {
+      await navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_CODE);
+      setCopiedScript(true);
+      setTimeout(() => setCopiedScript(false), 3000);
+    } catch (err) {
+      console.warn('Clipboard copy error:', err);
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    if (!webhookUrl || !webhookUrl.trim()) {
+      setTestEmailMsg('Please enter and save your Google Apps Script Webhook URL first.');
+      setTimeout(() => setTestEmailMsg(''), 4000);
+      return;
+    }
+
+    setSendingTestEmail(true);
+    setTestEmailMsg('');
+    try {
+      await fetch(webhookUrl.trim(), {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          isTest: true,
+          email_to: notificationEmail.trim() || 'khansaenterprises19@gmail.com',
+        }),
+      });
+      setTestEmailMsg(`Test email dispatched to ${notificationEmail.trim()}! Please check your inbox (and spam/promotions).`);
+      setTimeout(() => setTestEmailMsg(''), 6000);
+    } catch (err) {
+      setTestEmailMsg(`Error triggering test email: ${err.message}`);
+    } finally {
+      setSendingTestEmail(false);
+    }
+  };
+
+  // Sleeper Protection / Keep-Alive State
+  const [lastPingTime, setLastPingTime] = useState(() => getLastPingTimestamp());
+  const [pingingDb, setPingingDb] = useState(false);
+  const [pingResult, setPingResult] = useState('');
+
+  const handlePingDb = async () => {
+    setPingingDb(true);
+    setPingResult('');
+    const res = await pingDatabase();
+    setPingingDb(false);
+    if (res.success) {
+      setLastPingTime(res.timestamp);
+      setPingResult(`Database is Active! Ping responded in ${res.durationMs}ms.`);
+    } else {
+      setPingResult(`Ping failed: ${res.error}`);
+    }
+    setTimeout(() => setPingResult(''), 5000);
+  };
+
+  // Web Push Notification State
+  const [notifPermission, setNotifPermission] = useState(() =>
+    isPushNotificationSupported() ? Notification.permission : 'unsupported'
+  );
+  const [notifMsg, setNotifMsg] = useState('');
+
+  const handleRequestNotif = async () => {
+    const res = await requestNotificationPermission();
+    setNotifPermission(res);
+    if (res === 'granted') {
+      setNotifMsg('Push notifications enabled successfully!');
+      sendBrowserNotification('Khansa Invoices - Notifications Enabled', {
+        body: 'You will receive monthly GST reminders on the 8th (GSTR-1) and 19th (GSTR-3B).',
+      });
+    } else if (res === 'denied') {
+      setNotifMsg('Notifications permission was blocked in browser settings.');
+    }
+    setTimeout(() => setNotifMsg(''), 5000);
+  };
+
+  const handleSendTestNotif = () => {
+    const sent = sendBrowserNotification('Khansa Invoices - Test Reminder', {
+      body: 'This is a test notification for GST Reminders (8th: GSTR-1, 19th: GSTR-3B).',
+    });
+    if (sent) {
+      setNotifMsg('Test notification sent!');
+    } else {
+      setNotifMsg('Could not send notification. Please enable permission first.');
+    }
+    setTimeout(() => setNotifMsg(''), 4000);
+  };
+
+  // Complete Database Backup Download (Requirement 4)
+  const [downloadingBackup, setDownloadingBackup] = useState(false);
+  const [backupMsg, setBackupMsg] = useState('');
+
+  const handleDownloadBackup = async () => {
+    setDownloadingBackup(true);
+    setBackupMsg('');
+    try {
+      const [invRes, lineRes, buyerRes, itemRes, counterRes, firmRes] = await Promise.all([
+        supabase.from('invoices').select('*').order('created_at', { ascending: false }),
+        supabase.from('invoice_lines').select('*'),
+        supabase.from('buyers').select('*'),
+        supabase.from('items').select('*'),
+        supabase.from('counters').select('*'),
+        supabase.from('firm_profile').select('*').limit(1),
+      ]);
+
+      const backupData = {
+        app: 'Khansa Enterprises GST Invoicing',
+        exported_at: new Date().toISOString(),
+        invoices: invRes.data || [],
+        invoice_lines: lineRes.data || [],
+        buyers: buyerRes.data || [],
+        items: itemRes.data || [],
+        counters: counterRes.data || [],
+        firm_profile: firmRes.data || [],
+      };
+
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `khansa-invoices-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setBackupMsg(`Complete backup downloaded (${backupData.invoices.length} invoices saved)!`);
+      setTimeout(() => setBackupMsg(''), 5000);
+    } catch (err) {
+      setBackupMsg(`Failed to export backup: ${err.message}`);
+    } finally {
+      setDownloadingBackup(false);
     }
   };
 
@@ -684,19 +951,30 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* CARD 4: EMAIL & GOOGLE SHEETS AUTOMATION */}
+      {/* CARD 4: EMAIL & GOOGLE APPS SCRIPT AUTOMATION */}
       <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-4">
-        <div className="border-b border-slate-200 pb-3">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            Email &amp; Sheets Automation
+        <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Email Notifications
+            </span>
+            <h3 className="text-xl font-black text-slate-900 mt-0.5">
+              Automatic Email Delivery on Bill Creation
+            </h3>
+          </div>
+          <span
+            className={`text-xs font-black uppercase px-2.5 py-1 rounded-xl border ${
+              webhookUrl
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                : 'bg-amber-50 text-amber-800 border-amber-300'
+            }`}
+          >
+            {webhookUrl ? '✓ Webhook Configured' : '⚠️ Setup Pending'}
           </span>
-          <h3 className="text-xl font-black text-slate-900 mt-0.5">
-            Google Apps Script Webhook
-          </h3>
         </div>
 
         <p className="text-xs font-medium text-slate-600 leading-relaxed">
-          Automatically dispatch each finalized or edited bill copy to Google Sheets and send full email notifications.
+          Receive an instant formatted email copy every time an invoice is created or edited. Dispatched 100% free via your own Google Apps Script directly into your inbox.
         </p>
 
         {webhookStatus && (
@@ -705,24 +983,30 @@ export default function Settings() {
           </div>
         )}
 
+        {testEmailMsg && (
+          <div className="p-3 bg-blue-50 border border-blue-400 rounded-xl text-xs font-bold text-blue-950">
+            {testEmailMsg}
+          </div>
+        )}
+
         <form onSubmit={handleSaveWebhook} className="space-y-3.5">
           <div>
             <label htmlFor="notificationEmailInput" className="block text-sm font-bold text-slate-900 mb-1">
-              Recipient Email for Bill Copies
+              Recipient Email Address
             </label>
             <input
               id="notificationEmailInput"
               type="email"
               value={notificationEmail}
               onChange={(e) => setNotificationEmail(e.target.value)}
-              placeholder="e.g. khansaenterprises19@gmail.com"
-              className="w-full min-h-[48px] px-4 py-2.5 rounded-xl border-2 border-slate-400 bg-white text-slate-900 text-sm focus:border-slate-900"
+              placeholder="khansaenterprises19@gmail.com"
+              className="w-full min-h-[48px] px-4 py-2.5 rounded-xl border-2 border-slate-400 bg-white text-slate-900 text-sm focus:border-slate-900 font-semibold"
             />
           </div>
 
           <div>
             <label htmlFor="webhookUrlInput" className="block text-sm font-bold text-slate-900 mb-1">
-              Google Apps Script Webhook URL (POST)
+              Google Apps Script Webhook URL
             </label>
             <input
               id="webhookUrlInput"
@@ -734,13 +1018,23 @@ export default function Settings() {
             />
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2 pt-1">
             <button
               type="submit"
               className="min-h-[44px] px-5 py-2 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 cursor-pointer"
             >
-              Save Automation Settings
+              Save Email Settings
             </button>
+
+            <button
+              type="button"
+              disabled={sendingTestEmail || !webhookUrl}
+              onClick={handleSendTestEmail}
+              className="min-h-[44px] px-4 py-2 rounded-xl bg-blue-700 text-white font-bold text-sm hover:bg-blue-800 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center space-x-1.5"
+            >
+              <span>{sendingTestEmail ? 'Sending Test...' : '✉️ Send Test Email'}</span>
+            </button>
+
             {(webhookUrl || notificationEmail !== 'khansaenterprises19@gmail.com') && (
               <button
                 type="button"
@@ -759,6 +1053,190 @@ export default function Settings() {
             )}
           </div>
         </form>
+
+        {/* 1-Minute Turnkey Setup Instructions */}
+        <details className="mt-3 pt-3 border-t border-slate-200 group">
+          <summary className="text-xs font-bold text-blue-800 cursor-pointer hover:underline flex items-center justify-between">
+            <span>📖 Need to setup Google Apps Script? (Click for 1-minute instructions &amp; code)</span>
+            <span className="text-xs text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+          </summary>
+          <div className="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-300 text-xs text-slate-700 space-y-2.5">
+            <ol className="list-decimal list-inside space-y-1.5 font-medium leading-relaxed">
+              <li>Open <a href="https://script.google.com/home/start" target="_blank" rel="noreferrer" className="text-blue-700 underline font-bold">script.google.com</a> and click <strong>&quot;New Project&quot;</strong>.</li>
+              <li>Click the button below to copy the ready Google Apps Script. Replace the empty editor code with it and press <strong>Ctrl+S</strong> to save.</li>
+              <li>Click <strong>&quot;Deploy&quot;</strong> (top right) &rarr; <strong>&quot;New deployment&quot;</strong>.</li>
+              <li>Select type <strong>&quot;Web app&quot;</strong>. Set <em>Execute as: &quot;Me&quot;</em> and <em>Who has access: &quot;Anyone&quot;</em> (CRITICAL).</li>
+              <li>Click <strong>Deploy</strong>, grant permission, copy the Web App URL, and paste it in the box above!</li>
+            </ol>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleCopyScript}
+                className="px-4 py-2 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 cursor-pointer text-xs"
+              >
+                {copiedScript ? '✓ Copied to Clipboard!' : '📋 Copy Google Apps Script Code'}
+              </button>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      {/* CARD 5: FREE-TIER SLEEPER PROTECTION (KEEP-ALIVE) */}
+      <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Backend Reliability
+            </span>
+            <h3 className="text-xl font-black text-slate-900 mt-0.5">
+              Database Keep-Alive &amp; Sleeper Protection
+            </h3>
+          </div>
+          <span className="text-xs font-black uppercase px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300">
+            ✓ 24/7 Active
+          </span>
+        </div>
+
+        <p className="text-xs font-medium text-slate-600 leading-relaxed">
+          Supabase free-tier databases normally sleep after 7 days of inactivity. This app has two active safeguards: an automated GitHub Actions cron job running twice daily (at 04:00 and 16:00 UTC) and in-app keep-alive pings that keep your database awake 24/7 without interruption.
+        </p>
+
+        {pingResult && (
+          <div className="p-3 bg-blue-50 border border-blue-400 rounded-xl text-xs font-bold text-blue-950">
+            {pingResult}
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+          <div>
+            <span className="font-bold text-slate-700 block">Last Active Database Ping:</span>
+            <span className="font-mono text-slate-900 font-bold">
+              {lastPingTime ? new Date(lastPingTime).toLocaleString() : 'Active (on load)'}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            disabled={pingingDb}
+            onClick={handlePingDb}
+            className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 disabled:opacity-50 cursor-pointer self-start sm:self-auto"
+          >
+            {pingingDb ? 'Pinging...' : '⚡ Ping Database Now'}
+          </button>
+        </div>
+      </div>
+
+      {/* CARD 6: GST FILING & PAYMENT REMINDERS (PUSH NOTIFICATIONS) */}
+      <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Compliance Alerts
+            </span>
+            <h3 className="text-xl font-black text-slate-900 mt-0.5">
+              Monthly GST Reminders &amp; Push Notifications
+            </h3>
+          </div>
+          <span
+            className={`text-xs font-black uppercase px-2.5 py-1 rounded-xl border ${
+              notifPermission === 'granted'
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                : 'bg-slate-100 text-slate-700 border-slate-300'
+            }`}
+          >
+            {notifPermission === 'granted' ? '✓ Push Enabled' : 'Browser Bell'}
+          </span>
+        </div>
+
+        <p className="text-xs font-medium text-slate-600 leading-relaxed">
+          Automated reminders ensure you never miss statutory GST deadlines:
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
+            <span className="font-black text-blue-900 uppercase tracking-wide block mb-1">
+              📅 8th of every month
+            </span>
+            <p className="font-semibold text-blue-950">
+              <strong>GSTR-1 Sales Filing Reminder:</strong> Reminder to finalize invoices before the 11th filing deadline.
+            </p>
+          </div>
+
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+            <span className="font-black text-amber-900 uppercase tracking-wide block mb-1">
+              💰 19th of every month
+            </span>
+            <p className="font-semibold text-amber-950">
+              <strong>GSTR-3B Tax Payment Reminder:</strong> Reminder that monthly tax payment and GSTR-3B return are due tomorrow (20th).
+            </p>
+          </div>
+        </div>
+
+        {notifMsg && (
+          <div className="p-3 bg-emerald-50 border border-emerald-400 rounded-xl text-xs font-bold text-emerald-950">
+            {notifMsg}
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          {notifPermission !== 'granted' ? (
+            <button
+              type="button"
+              onClick={handleRequestNotif}
+              className="px-5 py-2.5 rounded-xl bg-blue-700 text-white font-bold text-xs hover:bg-blue-800 cursor-pointer"
+            >
+              🔔 Enable Push Notifications
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSendTestNotif}
+              className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 cursor-pointer"
+            >
+              Test Browser Notification
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* CARD 7: DATA SAFETY & COMPLETE OFFLINE BACKUP (Requirement 4) */}
+      <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Data Durability &amp; Safety
+            </span>
+            <h3 className="text-xl font-black text-slate-900 mt-0.5">
+              Permanent Cloud Storage &amp; Offline Backup
+            </h3>
+          </div>
+          <span className="text-xs font-black uppercase px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300">
+            ✓ Permanent DB
+          </span>
+        </div>
+
+        <p className="text-xs font-medium text-slate-600 leading-relaxed">
+          All your invoices, line items, buyer companies, and numbering sequences are permanently stored in encrypted cloud PostgreSQL on Supabase. You can also download a complete offline JSON backup to your phone or computer anytime with 1 click.
+        </p>
+
+        {backupMsg && (
+          <div className="p-3 bg-emerald-50 border border-emerald-400 rounded-xl text-xs font-bold text-emerald-950">
+            {backupMsg}
+          </div>
+        )}
+
+        <div>
+          <button
+            type="button"
+            disabled={downloadingBackup}
+            onClick={handleDownloadBackup}
+            className="min-h-[46px] px-5 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 disabled:opacity-50 cursor-pointer flex items-center space-x-2"
+          >
+            <span>💾</span>
+            <span>{downloadingBackup ? 'Exporting Backup...' : 'Download Full JSON Database Backup'}</span>
+          </button>
+        </div>
       </div>
 
       {/* App Version Info Footer */}

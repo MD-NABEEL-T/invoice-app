@@ -82,21 +82,20 @@ body {
   }
 
   .invoice-page {
-    width: 210mm !important;
-    max-width: 210mm !important;
-    min-width: 210mm !important;
-    height: 297mm !important;
-    min-height: 297mm !important;
-    max-height: 297mm !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: space-between !important;
+    width: 100% !important;
+    max-width: 194mm !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: 285mm !important;
+    display: block !important;
+    border: none !important;
     box-shadow: none !important;
     page-break-after: always !important;
     break-after: page !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     padding: 0 !important;
     box-sizing: border-box !important;
     background: #ffffff !important;

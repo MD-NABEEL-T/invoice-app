@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { formatRupees, formatDisplayDate, computeBillStats } from '../lib/billUtils.js';
 import { financialYear, formatInvoiceNo } from '../lib/tax.js';
+import { getGstReminder } from '../lib/gstReminders.js';
 
 export default function Home() {
   const currentFy = financialYear(new Date());
@@ -12,6 +13,8 @@ export default function Home() {
   const [isNumberingSet, setIsNumberingSet] = useState(false);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+  const [gstReminder, setGstReminder] = useState(() => getGstReminder());
+  const [reminderDismissed, setReminderDismissed] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -118,6 +121,64 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* GST Reminder Notification Banner (Active on 8th-11th for GSTR-1 and 19th-20th for GSTR-3B) */}
+      {gstReminder && !reminderDismissed && (
+        <div
+          className={`rounded-2xl border-2 p-4 shadow-sm transition relative ${
+            gstReminder.urgency === 'urgent'
+              ? 'bg-red-50 border-red-400 text-red-950'
+              : 'bg-amber-50 border-amber-400 text-amber-950'
+          }`}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start space-x-3 min-w-0">
+              <span className="text-2xl mt-0.5 shrink-0" role="img" aria-label="Reminder Bell">
+                {gstReminder.urgency === 'urgent' ? '🚨' : '🔔'}
+              </span>
+              <div className="min-w-0">
+                <div className="flex items-center space-x-2">
+                  <span
+                    className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md tracking-wider ${
+                      gstReminder.urgency === 'urgent'
+                        ? 'bg-red-600 text-white'
+                        : 'bg-amber-600 text-white'
+                    }`}
+                  >
+                    {gstReminder.badge}
+                  </span>
+                  <h3 className="text-sm sm:text-base font-black truncate">
+                    {gstReminder.title}
+                  </h3>
+                </div>
+                <p className="text-xs sm:text-sm font-semibold mt-1 leading-snug">
+                  {gstReminder.message}
+                </p>
+                <div className="mt-2.5 flex items-center space-x-3">
+                  <Link
+                    to={gstReminder.actionUrl}
+                    className={`text-xs font-black px-3 py-1.5 rounded-xl text-white inline-block shadow-sm ${
+                      gstReminder.urgency === 'urgent'
+                        ? 'bg-red-700 hover:bg-red-800'
+                        : 'bg-amber-700 hover:bg-amber-800'
+                    }`}
+                  >
+                    {gstReminder.actionLabel} &rarr;
+                  </Link>
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReminderDismissed(true)}
+              className="text-slate-500 hover:text-slate-800 font-black text-lg p-1 shrink-0 cursor-pointer"
+              aria-label="Dismiss reminder"
+            >
+              &times;
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Prominent "New Bill" Button */}
       <Link

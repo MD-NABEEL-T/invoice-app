@@ -114,10 +114,6 @@ export function validateBillForm({ header = {}, lines = [] } = {}) {
     errors.push('Buyer Order No is required');
   }
 
-  if (!header.despatched_through || !String(header.despatched_through).trim()) {
-    errors.push('Despatched Through is required');
-  }
-
   if (!Array.isArray(lines) || lines.length === 0) {
     errors.push('Add at least one line item');
   } else {
