@@ -3,7 +3,89 @@
 @tailwind utilities;
 
 :root {
-  font-size: 18px;
+  font-size: 17px;
+  /* Default Executive Emerald Theme */
+  --brand-primary: #059669;
+  --brand-primary-hover: #047857;
+  --brand-primary-light: #ecfdf5;
+  --brand-primary-border: #a7f3d0;
+  --brand-primary-text: #065f46;
+}
+
+/* Tablet & Laptop UI Scale: Prevents the interface from feeling humongous on desktop screens */
+@media (min-width: 768px) {
+  :root {
+    font-size: 15px;
+  }
+}
+
+@media (min-width: 1280px) {
+  :root {
+    font-size: 14.5px;
+  }
+}
+
+/* Theme: Executive Emerald (Accounting & Ledger Standard) */
+:root.theme-emerald,
+html.theme-emerald {
+  --brand-primary: #059669;
+  --brand-primary-hover: #047857;
+  --brand-primary-light: #ecfdf5;
+  --brand-primary-border: #a7f3d0;
+  --brand-primary-text: #065f46;
+}
+
+/* Theme: Royal Navy (Corporate Banking) */
+:root.theme-navy,
+html.theme-navy {
+  --brand-primary: #2563eb;
+  --brand-primary-hover: #1d4ed8;
+  --brand-primary-light: #eff6ff;
+  --brand-primary-border: #bfdbfe;
+  --brand-primary-text: #1e40af;
+}
+
+/* Theme: Nordic Teal (Modern & Balanced) */
+:root.theme-teal,
+html.theme-teal {
+  --brand-primary: #0d9488;
+  --brand-primary-hover: #0f766e;
+  --brand-primary-light: #f0fdfa;
+  --brand-primary-border: #99f6e4;
+  --brand-primary-text: #115e59;
+}
+
+/* Theme: Industrial Amber (Warm Trading & Manufacturing) */
+:root.theme-charcoal,
+html.theme-charcoal {
+  --brand-primary: #d97706;
+  --brand-primary-hover: #b45309;
+  --brand-primary-light: #fffbeb;
+  --brand-primary-border: #fde68a;
+  --brand-primary-text: #92400e;
+}
+
+.btn-brand {
+  background-color: var(--brand-primary);
+  color: #ffffff;
+  transition: background-color 0.15s ease-in-out;
+}
+.btn-brand:hover {
+  background-color: var(--brand-primary-hover);
+}
+
+.text-brand {
+  color: var(--brand-primary);
+}
+
+.border-brand {
+  border-color: var(--brand-primary);
+}
+
+.badge-brand {
+  background-color: var(--brand-primary-light);
+  color: var(--brand-primary-text);
+  border: 1px solid var(--brand-primary-border);
 }
 
 body {

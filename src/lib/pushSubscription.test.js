@@ -14,3 +14,4 @@ describe('Push Subscription Utilities', () => {
     expect(bytes).toBeInstanceOf(Uint8Array);
   });
 });
+

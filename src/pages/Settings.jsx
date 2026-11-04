@@ -6,9 +6,18 @@ import { validateGSTIN } from '../lib/itemValidation.js';
 import { pingDatabase, getLastPingTimestamp } from '../lib/keepAlive.js';
 import { isPushNotificationSupported, requestNotificationPermission, sendBrowserNotification } from '../lib/gstReminders.js';
 import { subscribeToPushNotifications, getPushSubscriptionState } from '../lib/pushSubscription.js';
+import { THEMES, getStoredTheme, applyTheme } from '../lib/theme.js';
 
 export default function Settings() {
   const currentFy = financialYear(new Date());
+
+  // App Theme State
+  const [currentTheme, setCurrentTheme] = useState(() => getStoredTheme());
+
+  const handleSelectTheme = (themeId) => {
+    applyTheme(themeId);
+    setCurrentTheme(themeId);
+  };
 
   // Firm Profile State
   const [firm, setFirm] = useState({
@@ -807,6 +816,78 @@ export default function Settings() {
             </button>
           </form>
         )}
+      </div>
+
+      {/* CARD 2B: APP THEME & RELIABLE COLOR PALETTES */}
+      <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
+          <div>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Visual Appearance
+            </span>
+            <h3 className="text-xl font-black text-slate-900 mt-0.5">
+              App Theme &amp; Color Scheme
+            </h3>
+          </div>
+          <span className="text-xs font-black uppercase px-2.5 py-1 rounded-xl bg-slate-100 text-slate-800 border border-slate-300">
+            🎨 4 Palettes
+          </span>
+        </div>
+
+        <p className="text-xs font-medium text-slate-600 leading-relaxed">
+          Choose a reliable, professional color scheme tailored for invoicing and accounting:
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          {THEMES.map((theme) => {
+            const isSelected = currentTheme === theme.id;
+            return (
+              <button
+                key={theme.id}
+                type="button"
+                onClick={() => handleSelectTheme(theme.id)}
+                className={`text-left p-4 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between space-y-2.5 ${
+                  isSelected
+                    ? 'border-slate-900 bg-slate-50/80 shadow-sm ring-2 ring-slate-900/10'
+                    : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50/50'
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center space-x-2">
+                    <span
+                      className="w-4 h-4 rounded-full border border-black/20 shadow-inner"
+                      style={{ backgroundColor: theme.accentHex }}
+                    />
+                    <span className="text-sm font-bold text-slate-900">{theme.name}</span>
+                  </div>
+                  {isSelected ? (
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-900 text-white">
+                      Active
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-semibold text-slate-500">
+                      {theme.badgeText}
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-xs text-slate-600 font-medium leading-snug">
+                  {theme.description}
+                </p>
+
+                <div className="flex items-center space-x-1.5 pt-1">
+                  {theme.previewColors.map((hex, idx) => (
+                    <span
+                      key={idx}
+                      className="w-5 h-3 rounded-sm border border-slate-300 shadow-xs"
+                      style={{ backgroundColor: hex }}
+                    />
+                  ))}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* CARD 3: PRINT & PDF OPTIONS */}

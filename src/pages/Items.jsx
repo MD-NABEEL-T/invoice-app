@@ -251,7 +251,7 @@ export default function Items() {
               });
               setHsnWarning(null);
             }}
-            className="min-h-[44px] px-4 py-2 rounded-xl bg-blue-700 text-white font-bold text-xs hover:bg-blue-800 shadow-sm flex items-center space-x-1 cursor-pointer"
+            className="min-h-[44px] md:min-h-[38px] px-4 py-2 md:py-1.5 rounded-xl btn-brand text-white font-bold text-xs shadow-sm flex items-center space-x-1 cursor-pointer"
           >
             <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -696,7 +696,7 @@ export default function Items() {
                 <button
                   type="submit"
                   disabled={savingItem}
-                  className="flex-1 min-h-[48px] rounded-xl bg-blue-700 text-white font-bold hover:bg-blue-800 cursor-pointer"
+                  className="flex-1 min-h-[48px] md:min-h-[42px] rounded-xl btn-brand text-white font-bold hover:opacity-90 cursor-pointer"
                 >
                   {savingItem ? 'Saving...' : 'Save Item'}
                 </button>

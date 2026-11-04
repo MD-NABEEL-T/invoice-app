@@ -224,7 +224,7 @@ export default function Buyers() {
           setBuyerModal({ isOpen: true, mode: 'add', id: null, name: '', gstin: '', state_code: '33' });
           setBuyerWarning(null);
         }}
-        className="w-full min-h-[54px] px-6 py-3.5 rounded-2xl bg-blue-700 text-white font-black text-lg hover:bg-blue-800 active:bg-blue-900 shadow-md flex items-center justify-center space-x-2 transition"
+        className="w-full min-h-[54px] md:min-h-[44px] px-6 py-3.5 md:py-2 rounded-2xl md:rounded-xl btn-brand text-white font-black text-lg md:text-base shadow-md flex items-center justify-center space-x-2 transition cursor-pointer"
       >
         <svg className="w-6 h-6 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -490,7 +490,7 @@ export default function Buyers() {
                 <button
                   type="submit"
                   disabled={savingBuyer}
-                  className="flex-1 min-h-[48px] rounded-xl bg-blue-700 text-white font-bold hover:bg-blue-800"
+                  className="flex-1 min-h-[48px] md:min-h-[42px] rounded-xl btn-brand text-white font-bold hover:opacity-90 cursor-pointer"
                 >
                   {savingBuyer ? 'Saving...' : 'Save Buyer'}
                 </button>
@@ -560,7 +560,7 @@ export default function Buyers() {
                 <button
                   type="submit"
                   disabled={savingBranch}
-                  className="flex-1 min-h-[48px] rounded-xl bg-blue-700 text-white font-bold hover:bg-blue-800"
+                  className="flex-1 min-h-[48px] md:min-h-[42px] rounded-xl btn-brand text-white font-bold hover:opacity-90 cursor-pointer"
                 >
                   {savingBranch ? 'Saving...' : 'Save Unit / Address'}
                 </button>

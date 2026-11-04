@@ -282,13 +282,13 @@ export default function NewBill() {
         if (inv.invoice_date) setBillDate(inv.invoice_date);
         if (inv.buyer_id) setSelectedBuyerId(inv.buyer_id);
         if (inv.buyer_address) setChosenAddress(inv.buyer_address);
-        if (inv.buyer_order_no) setBuyerOrderNo(inv.buyer_order_no.toUpperCase());
+        if (inv.buyer_order_no !== null && inv.buyer_order_no !== undefined) setBuyerOrderNo(String(inv.buyer_order_no).toUpperCase());
         if (inv.buyer_order_date) setBuyerOrderDate(inv.buyer_order_date);
-        if (inv.delivery_no) setDeliveryNo(inv.delivery_no);
+        if (inv.delivery_no !== null && inv.delivery_no !== undefined) setDeliveryNo(String(inv.delivery_no));
         if (inv.delivery_date) setDeliveryDate(inv.delivery_date);
-        if (inv.despatched_through) setDespatchedThrough(inv.despatched_through);
-        if (inv.destination) setDestination(inv.destination);
-        if (inv.terms_of_delivery) setTermsOfDelivery(inv.terms_of_delivery);
+        if (inv.despatched_through) setDespatchedThrough(String(inv.despatched_through));
+        if (inv.destination) setDestination(String(inv.destination));
+        if (inv.terms_of_delivery) setTermsOfDelivery(String(inv.terms_of_delivery));
 
         if (Array.isArray(inv.lines) && inv.lines.length > 0) {
           const sorted = [...inv.lines].sort((a, b) => (a.line_no || 0) - (b.line_no || 0));
@@ -350,12 +350,12 @@ export default function NewBill() {
         setCopiedFromNotice(`Copied details from bill ${inv.invoice_no}. A new invoice number will be assigned at finalization.`);
         if (inv.buyer_id) setSelectedBuyerId(inv.buyer_id);
         if (inv.buyer_address) setChosenAddress(inv.buyer_address);
-        if (inv.buyer_order_no) setBuyerOrderNo(inv.buyer_order_no.toUpperCase());
+        if (inv.buyer_order_no !== null && inv.buyer_order_no !== undefined) setBuyerOrderNo(String(inv.buyer_order_no).toUpperCase());
         if (inv.buyer_order_date) setBuyerOrderDate(inv.buyer_order_date);
-        if (inv.delivery_no) setDeliveryNo(inv.delivery_no);
-        if (inv.despatched_through) setDespatchedThrough(inv.despatched_through);
-        if (inv.destination) setDestination(inv.destination);
-        if (inv.terms_of_delivery) setTermsOfDelivery(inv.terms_of_delivery);
+        if (inv.delivery_no !== null && inv.delivery_no !== undefined) setDeliveryNo(String(inv.delivery_no));
+        if (inv.despatched_through) setDespatchedThrough(String(inv.despatched_through));
+        if (inv.destination) setDestination(String(inv.destination));
+        if (inv.terms_of_delivery) setTermsOfDelivery(String(inv.terms_of_delivery));
 
         if (Array.isArray(inv.lines) && inv.lines.length > 0) {
           const sorted = [...inv.lines].sort((a, b) => (a.line_no || 0) - (b.line_no || 0));
@@ -1744,7 +1744,7 @@ export default function NewBill() {
             type="button"
             onClick={handleInitiateSave}
             disabled={isSaving}
-            className="min-h-[52px] px-6 py-3 rounded-2xl bg-blue-600 text-white font-black text-lg hover:bg-blue-500 active:bg-blue-700 shadow-lg flex items-center space-x-2 transition disabled:opacity-50 cursor-pointer"
+            className="min-h-[52px] md:min-h-[44px] px-6 py-3 md:py-2 rounded-2xl md:rounded-xl btn-brand text-white font-black text-lg md:text-base shadow-lg flex items-center space-x-2 transition disabled:opacity-50 cursor-pointer"
           >
             <span>{isSaving ? 'Saving...' : isEditMode ? 'Update Bill' : 'Save Bill'}</span>
             <svg className="w-5 h-5 stroke-[3]" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1810,7 +1810,7 @@ export default function NewBill() {
                 type="button"
                 onClick={handleConfirmSave}
                 disabled={isSaving}
-                className="flex-1 min-h-[48px] rounded-2xl bg-blue-700 text-white font-black hover:bg-blue-800 disabled:opacity-50"
+                className="flex-1 min-h-[48px] md:min-h-[42px] rounded-2xl md:rounded-xl btn-brand text-white font-black hover:opacity-90 disabled:opacity-50"
               >
                 {isSaving ? 'Saving...' : isEditMode ? 'Update Bill' : 'Yes, Finalize'}
               </button>
@@ -1978,7 +1978,7 @@ export default function NewBill() {
                 <button
                   type="submit"
                   disabled={newItemSaving}
-                  className="flex-1 min-h-[48px] rounded-2xl bg-blue-700 text-white font-black hover:bg-blue-800 disabled:opacity-50"
+                  className="flex-1 min-h-[48px] md:min-h-[42px] rounded-2xl md:rounded-xl btn-brand text-white font-black hover:opacity-90 disabled:opacity-50"
                 >
                   {newItemSaving ? 'Saving...' : 'Save & Add Line'}
                 </button>

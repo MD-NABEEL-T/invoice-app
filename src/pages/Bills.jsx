@@ -69,7 +69,7 @@ export default function Bills() {
 
         <Link
           to="/new"
-          className="min-h-[48px] px-4 py-2.5 rounded-2xl bg-blue-700 text-white font-black text-sm hover:bg-blue-800 shadow-sm flex items-center space-x-1"
+          className="min-h-[48px] md:min-h-[40px] px-4 py-2.5 md:py-1.5 rounded-2xl md:rounded-xl btn-brand text-white font-black text-sm shadow-sm flex items-center space-x-1 cursor-pointer"
         >
           <svg className="w-5 h-5 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />

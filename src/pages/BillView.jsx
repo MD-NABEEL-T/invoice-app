@@ -328,7 +328,7 @@ export default function BillView() {
             setPdfMessage('');
             setShowPrintModal(true);
           }}
-          className="w-full sm:w-auto min-h-[48px] sm:min-h-[50px] px-5 sm:px-6 py-2.5 rounded-2xl bg-blue-700 text-white font-black text-base hover:bg-blue-800 active:bg-blue-900 shadow-md flex items-center justify-center space-x-2 active:scale-[0.98] transition cursor-pointer"
+          className="w-full sm:w-auto min-h-[48px] sm:min-h-[44px] px-5 sm:px-6 py-2.5 rounded-2xl md:rounded-xl btn-brand text-white font-black text-base md:text-sm shadow-md flex items-center justify-center space-x-2 active:scale-[0.98] transition cursor-pointer"
         >
           <svg className="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -677,7 +677,7 @@ export default function BillView() {
             setPdfMessage('');
             setShowPrintModal(true);
           }}
-          className="w-full min-h-[48px] px-4 py-2.5 rounded-2xl bg-blue-700 text-white font-black text-base hover:bg-blue-800 shadow-md flex items-center justify-center space-x-2 active:scale-[0.98] transition cursor-pointer"
+          className="w-full min-h-[48px] md:min-h-[44px] px-4 py-2.5 rounded-2xl md:rounded-xl btn-brand text-white font-black text-base md:text-sm shadow-md flex items-center justify-center space-x-2 active:scale-[0.98] transition cursor-pointer"
         >
           <svg className="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -788,7 +788,7 @@ export default function BillView() {
                   type="button"
                   disabled={generatingPdf}
                   onClick={() => handlePdfAction('download')}
-                  className="w-full min-h-[48px] px-4 py-2.5 rounded-2xl bg-blue-700 text-white font-bold text-sm hover:bg-blue-800 disabled:opacity-50 flex items-center justify-center space-x-1.5 transition cursor-pointer"
+                  className="w-full min-h-[48px] md:min-h-[42px] px-4 py-2.5 rounded-2xl md:rounded-xl btn-brand text-white font-bold text-sm disabled:opacity-50 flex items-center justify-center space-x-1.5 transition cursor-pointer"
                 >
                   <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

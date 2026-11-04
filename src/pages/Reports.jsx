@@ -323,14 +323,14 @@ export default function Reports() {
           </span>
         </div>
 
-        <div className="bg-blue-50/70 p-4 rounded-2xl border-2 border-blue-300 shadow-sm">
-          <span className="text-xs font-bold text-blue-700 uppercase tracking-wide block">
+        <div className="badge-brand p-4 rounded-2xl border-2 shadow-sm">
+          <span className="text-xs font-bold uppercase tracking-wide block">
             Total Revenue
           </span>
-          <span className="text-xl sm:text-2xl font-black font-mono text-blue-950 block mt-1">
+          <span className="text-xl sm:text-2xl font-black font-mono block mt-1">
             {formatRupees(kpiTotals.payablePaise)}
           </span>
-          <span className="text-[11px] font-bold text-blue-700 block mt-0.5">
+          <span className="text-[11px] font-bold block mt-0.5 opacity-80">
             Grand Total
           </span>
         </div>

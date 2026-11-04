@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import PwaInstallPrompt from './PwaInstallPrompt.jsx';
+import { getStoredTheme, applyTheme } from '../lib/theme.js';
 
 export default function AppShell() {
   const location = useLocation();
   const [isOnline, setIsOnline] = useState(
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
+
+  useEffect(() => {
+    applyTheme(getStoredTheme());
+  }, []);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -72,8 +77,8 @@ export default function AppShell() {
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
       {/* Top Header */}
-      <header className="sticky top-0 z-20 bg-slate-900 text-white shadow-md border-b-2 border-slate-950 px-4 py-3 sm:px-6">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
+      <header className="sticky top-0 z-20 bg-slate-900 text-white shadow-md border-b-2 border-slate-950 px-4 py-2.5 sm:px-6">
+        <div className="max-w-4xl lg:max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
             <img
               src="/KhansaEnterprises.jpg"
@@ -81,22 +86,44 @@ export default function AppShell() {
               className="w-9 h-9 rounded-xl object-contain bg-white border border-slate-700 shadow-sm p-0.5"
             />
             <div>
-              <h1 className="text-lg font-black tracking-wide leading-tight uppercase">
+              <h1 className="text-base sm:text-lg font-black tracking-wide leading-tight uppercase">
                 Khansa Enterprises
               </h1>
-              <p className="text-xs text-slate-300 font-medium">
+              <p className="text-[11px] sm:text-xs text-slate-300 font-medium">
                 GST Invoicing App
               </p>
             </div>
           </div>
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-950 text-emerald-300 border border-emerald-700">
+
+          {/* Desktop Navigation Bar (Visible on Laptops and Tablets, replaces bottom bar) */}
+          <nav className="hidden md:flex items-center space-x-1 lg:space-x-1.5" aria-label="Desktop Navigation">
+            {navItems.map((item) => {
+              const isActive = location.pathname === item.to;
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${
+                    isActive
+                      ? 'bg-slate-800 text-white shadow-sm ring-1 ring-slate-600'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <span className="w-4 h-4 shrink-0 flex items-center">{item.icon}</span>
+                  <span>{item.label}</span>
+                </NavLink>
+              );
+            })}
+          </nav>
+
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-950 text-emerald-300 border border-emerald-700">
             TN Intra-State
           </span>
         </div>
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-28">
+      <main className="flex-1 w-full max-w-4xl lg:max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-28 md:pb-10">
         {!isOnline && (
           <div
             role="alert"
@@ -110,10 +137,10 @@ export default function AppShell() {
         <Outlet />
       </main>
 
-      {/* Bottom Navigation Bar */}
+      {/* Bottom Navigation Bar (Mobile Phones Only, hidden on laptops and tablets) */}
       <nav
         aria-label="Bottom Navigation"
-        className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t-2 border-slate-300 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom)]"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t-2 border-slate-300 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom)]"
       >
         <div className="max-w-4xl mx-auto grid grid-cols-5 h-20">
           {navItems.map((item) => {

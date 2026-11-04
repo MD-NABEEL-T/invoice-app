@@ -46,3 +46,4 @@ CREATE POLICY "anon_all_app_settings" ON public.app_settings
 DROP POLICY IF EXISTS "auth_all_app_settings" ON public.app_settings;
 CREATE POLICY "auth_all_app_settings" ON public.app_settings
     FOR ALL TO authenticated USING (true) WITH CHECK (true);
+

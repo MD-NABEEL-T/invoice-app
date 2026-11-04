@@ -113,7 +113,7 @@ export default function Home() {
               <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider block whitespace-nowrap">
                 Next Bill
               </span>
-              <span className="text-sm sm:text-lg font-black text-blue-700 bg-blue-50 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-xl border border-blue-200 inline-block mt-0.5 whitespace-nowrap font-mono tracking-tight">
+              <span className="text-sm sm:text-base font-black text-brand bg-slate-50 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-xl border border-slate-300 inline-block mt-0.5 whitespace-nowrap font-mono tracking-tight">
                 {nextBillNo}
               </span>
             </div>
@@ -233,12 +233,12 @@ export default function Home() {
       {/* Prominent "New Bill" Button */}
       <Link
         to="/new"
-        className="w-full min-h-[58px] px-6 py-4 rounded-2xl bg-blue-700 hover:bg-blue-800 active:bg-blue-900 text-white flex items-center justify-center space-x-3 shadow-md transition transform active:scale-[0.99]"
+        className="w-full min-h-[56px] md:min-h-[48px] px-6 py-3.5 md:py-2.5 rounded-2xl md:rounded-xl btn-brand text-white flex items-center justify-center space-x-3 shadow-md transition transform active:scale-[0.99] cursor-pointer"
       >
-        <svg className="w-7 h-7 stroke-[3]" width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-6 h-6 md:w-5 md:h-5 stroke-[3]" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
         </svg>
-        <span className="text-xl font-extrabold tracking-wide uppercase">
+        <span className="text-lg md:text-base font-extrabold tracking-wide uppercase">
           New Bill
         </span>
       </Link>
