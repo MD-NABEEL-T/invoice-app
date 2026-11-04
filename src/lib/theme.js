@@ -64,3 +64,4 @@ export function applyTheme(themeId) {
 
   return validTheme;
 }
+

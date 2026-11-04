@@ -110,16 +110,17 @@ export default function Settings() {
   const [testEmailMsg, setTestEmailMsg] = useState('');
 
   const handleSendTestEmail = async () => {
-    if (!webhookUrl || !webhookUrl.trim()) {
-      setTestEmailMsg('Please enter and save your Google Apps Script Webhook URL first.');
-      setTimeout(() => setTestEmailMsg(''), 4000);
+    const activeUrl = webhookUrl.trim() || import.meta.env.VITE_EMAIL_WEBHOOK_URL || '';
+    if (!activeUrl) {
+      setTestEmailMsg('Notice: Email dispatcher webhook URL is not connected yet. Once you deploy your Google Apps Script and enter the Web App URL in Advanced Settings, email delivery will activate.');
+      setTimeout(() => setTestEmailMsg(''), 6000);
       return;
     }
 
     setSendingTestEmail(true);
     setTestEmailMsg('');
     try {
-      await fetch(webhookUrl.trim(), {
+      await fetch(activeUrl, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -961,22 +962,16 @@ export default function Settings() {
               Email Notifications
             </span>
             <h3 className="text-xl font-black text-slate-900 mt-0.5">
-              Automatic Email Delivery on Bill Creation
+              Invoice Delivery Email
             </h3>
           </div>
-          <span
-            className={`text-xs font-black uppercase px-2.5 py-1 rounded-xl border ${
-              webhookUrl
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                : 'bg-amber-50 text-amber-800 border-amber-300'
-            }`}
-          >
-            {webhookUrl ? '✓ Webhook Configured' : '⚠️ Setup Pending'}
+          <span className="text-xs font-black uppercase px-2.5 py-1 rounded-xl bg-slate-100 text-slate-800 border border-slate-300">
+            ✉️ Invoice Copy
           </span>
         </div>
 
         <p className="text-xs font-medium text-slate-600 leading-relaxed">
-          Receive an instant formatted email copy every time an invoice is created or edited. Dispatched 100% free via your own Google Apps Script directly into your inbox.
+          Whenever a bill is finalized or edited, an automated copy is sent directly to your registered business email address.
         </p>
 
         {webhookStatus && (
@@ -1006,54 +1001,47 @@ export default function Settings() {
             />
           </div>
 
-          <div>
-            <label htmlFor="webhookUrlInput" className="block text-sm font-bold text-slate-900 mb-1">
-              Google Apps Script Webhook URL
-            </label>
-            <input
-              id="webhookUrlInput"
-              type="url"
-              value={webhookUrl}
-              onChange={(e) => setWebhookUrl(e.target.value)}
-              placeholder="https://script.google.com/macros/s/.../exec"
-              className="w-full min-h-[48px] px-4 py-2.5 rounded-xl border-2 border-slate-400 bg-white text-slate-900 text-sm font-mono focus:border-slate-900"
-            />
-          </div>
-
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <button
               type="submit"
-              className="min-h-[44px] px-5 py-2 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 cursor-pointer"
+              className="min-h-[44px] px-5 py-2 rounded-xl btn-brand text-white font-bold text-sm shadow-sm cursor-pointer"
             >
-              Save Email Settings
+              Save Email Address
             </button>
 
             <button
               type="button"
-              disabled={sendingTestEmail || !webhookUrl}
+              disabled={sendingTestEmail}
               onClick={handleSendTestEmail}
-              className="min-h-[44px] px-4 py-2 rounded-xl bg-blue-700 text-white font-bold text-sm hover:bg-blue-800 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center space-x-1.5"
+              className="min-h-[44px] px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 disabled:opacity-40 cursor-pointer flex items-center space-x-1.5"
             >
               <span>{sendingTestEmail ? 'Sending Test...' : '✉️ Send Test Email'}</span>
             </button>
-
-            {(webhookUrl || notificationEmail !== 'khansaenterprises19@gmail.com') && (
-              <button
-                type="button"
-                onClick={() => {
-                  setWebhookUrl('');
-                  setNotificationEmail('khansaenterprises19@gmail.com');
-                  localStorage.removeItem('khansa_gsheet_webhook_url');
-                  localStorage.removeItem('khansa_notification_email');
-                  setWebhookStatus('Webhook settings reset.');
-                  setTimeout(() => setWebhookStatus(''), 3000);
-                }}
-                className="min-h-[44px] px-3.5 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-50 cursor-pointer"
-              >
-                Reset
-              </button>
-            )}
           </div>
+
+          {/* Hidden/Collapsed Advanced Webhook URL for Developer / Admin Only */}
+          <details className="mt-4 pt-3 border-t border-slate-200 group text-xs text-slate-600">
+            <summary className="font-semibold text-slate-500 cursor-pointer hover:text-slate-800 flex items-center justify-between py-1">
+              <span>⚙️ Advanced: Email Dispatch Webhook URL (Developer / Admin)</span>
+              <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div className="mt-3 space-y-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <label htmlFor="webhookUrlInput" className="block text-xs font-bold text-slate-700">
+                Google Apps Script Dispatcher URL
+              </label>
+              <input
+                id="webhookUrlInput"
+                type="url"
+                value={webhookUrl}
+                onChange={(e) => setWebhookUrl(e.target.value)}
+                placeholder="https://script.google.com/macros/s/.../exec"
+                className="w-full min-h-[42px] px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-800 text-xs font-mono"
+              />
+              <p className="text-[11px] text-slate-500 leading-normal">
+                Leave blank to use environment default, or paste a deployed Apps Script URL to route bill notifications through custom Gmail.
+              </p>
+            </div>
+          </details>
         </form>
       </div>
 

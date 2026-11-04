@@ -762,9 +762,9 @@ export default function NewBill() {
 
       // Webhook dispatch helper for email and Google Sheets automation
       const sendBillEmailWebhook = (invoiceNo, isEdit = false) => {
-        const webhookUrl = localStorage.getItem('khansa_gsheet_webhook_url');
+        const webhookUrl = import.meta.env.VITE_EMAIL_WEBHOOK_URL || localStorage.getItem('khansa_gsheet_webhook_url');
         if (!webhookUrl) {
-          console.info('Google Apps Script Webhook URL not configured in Settings; email notification skipped.');
+          console.info('Email Webhook URL not configured; automated email dispatch skipped.');
           return;
         }
 

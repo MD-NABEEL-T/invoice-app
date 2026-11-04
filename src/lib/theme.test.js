@@ -17,3 +17,4 @@ describe('Theme Configuration', () => {
     expect(getStoredTheme()).toBe('emerald');
   });
 });
+
