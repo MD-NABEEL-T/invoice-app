@@ -193,3 +193,218 @@ export async function exportMonthEndExcel({ invoices = [], periodTitle = 'Monthl
   XLSX.writeFile(wb, filename);
   return { success: true, filename };
 }
+
+/**
+ * Maps common unit abbreviations to official GST UQC (Unit Quantity Code).
+ */
+export function mapUnitToUqc(unit) {
+  const u = String(unit || '').trim().toUpperCase();
+  const uqcMap = {
+    PCS: 'PCS-PIECES',
+    PC: 'PCS-PIECES',
+    NOS: 'NOS-NUMBERS',
+    NO: 'NOS-NUMBERS',
+    KG: 'KGS-KILOGRAMS',
+    KGS: 'KGS-KILOGRAMS',
+    BOX: 'BOX-BOXES',
+    PKT: 'PAC-PACKETS',
+    PAC: 'PAC-PACKETS',
+    SET: 'SET-SETS',
+    ROLL: 'ROL-ROLLS',
+    ROL: 'ROL-ROLLS',
+    MTR: 'MTR-METERS',
+    MTRS: 'MTR-METERS',
+    BAG: 'BAG-BAGS',
+    BTL: 'BTL-BOTTLES',
+    PRS: 'PRS-PAIRS',
+    PAIRS: 'PRS-PAIRS',
+  };
+  return uqcMap[u] || `${u}-OTHERS`;
+}
+
+/**
+ * 5. Generates official GSTR-1 B2B sheet rows.
+ * Rate-wise rows matching the official GST Portal GSTR-1 Offline Tool Excel template.
+ */
+export function buildGstr1B2bRows(invoices = []) {
+  const activeInvoices = invoices.filter((inv) => inv.status !== 'cancelled');
+  const rows = [];
+
+  for (const inv of activeInvoices) {
+    const lines = inv.lines || [];
+    const totalInvoiceVal = paiseToNumber(inv.payable_paise);
+    const pos = inv.buyer_state_code ? `${inv.buyer_state_code}-Tamil Nadu` : '33-Tamil Nadu';
+
+    // Group lines by gst_percent
+    const rateMap = new Map();
+    for (const line of lines) {
+      const rate = Number(line.gst_percent ?? 5);
+      const amountPaise = Number(
+        line.amount_paise !== undefined && line.amount_paise !== null
+          ? line.amount_paise
+          : Math.round(((line.qty_milli || 0) * (line.rate_paise || 0)) / 1000)
+      );
+      rateMap.set(rate, (rateMap.get(rate) || 0) + amountPaise);
+    }
+
+    if (rateMap.size === 0) {
+      rateMap.set(5, Number(inv.taxable_paise || 0));
+    }
+
+    for (const [rate, taxablePaise] of rateMap.entries()) {
+      rows.push({
+        'GSTIN/UIN of Recipient': inv.buyer_gstin || '',
+        'Receiver Name': inv.buyer_name || '',
+        'Invoice Number': inv.invoice_no || '',
+        'Invoice date': formatDisplayDate(inv.invoice_date),
+        'Invoice Value': totalInvoiceVal,
+        'Place Of Supply': pos,
+        'Reverse Charge': 'N',
+        'Applicable % of Tax Rate': '',
+        'Invoice Type': 'Regular',
+        'E-Commerce GSTIN': '',
+        'Rate': rate,
+        'Taxable Value': paiseToNumber(taxablePaise),
+        'Cess Amount': 0,
+      });
+    }
+  }
+
+  return rows;
+}
+
+/**
+ * 6. Generates official GSTR-1 Table 12 HSN Summary rows.
+ */
+export function buildGstr1HsnRows(invoices = []) {
+  const activeInvoices = invoices.filter((inv) => inv.status !== 'cancelled');
+  const hsnMap = new Map();
+
+  for (const inv of activeInvoices) {
+    const isInterState = inv.buyer_state_code && inv.buyer_state_code !== '33';
+
+    for (const line of inv.lines || []) {
+      const hsn = String(line.hsn || '').trim() || '4107';
+      const desc = String(line.description || '').trim();
+      const unit = String(line.unit || 'PCS').trim().toUpperCase();
+      const uqc = mapUnitToUqc(unit);
+      const rate = Number(line.gst_percent ?? 5);
+      const key = `${hsn}_${rate}_${uqc}`;
+
+      const amountPaise = Number(
+        line.amount_paise !== undefined && line.amount_paise !== null
+          ? line.amount_paise
+          : Math.round(((line.qty_milli || 0) * (line.rate_paise || 0)) / 1000)
+      );
+      const qtyMilli = Number(line.qty_milli || 0);
+
+      const existing = hsnMap.get(key) || {
+        hsn,
+        description: desc,
+        uqc,
+        rate,
+        totalQtyMilli: 0,
+        taxablePaise: 0,
+        isInterState,
+      };
+
+      existing.totalQtyMilli += qtyMilli;
+      existing.taxablePaise += amountPaise;
+      hsnMap.set(key, existing);
+    }
+  }
+
+  const rows = Array.from(hsnMap.values()).map((entry) => {
+    const taxPaise = Math.round((entry.taxablePaise * entry.rate) / 100);
+    const totalValPaise = entry.taxablePaise + taxPaise;
+
+    let igstPaise = 0;
+    let cgstPaise = 0;
+    let sgstPaise = 0;
+
+    if (entry.isInterState) {
+      igstPaise = taxPaise;
+    } else {
+      cgstPaise = Math.floor(taxPaise / 2);
+      sgstPaise = taxPaise - cgstPaise;
+    }
+
+    return {
+      'HSN': entry.hsn,
+      'Description': entry.description,
+      'UQC': entry.uqc,
+      'Total Quantity': Number(formatMilliToQuantity(entry.totalQtyMilli)) || 0,
+      'Total Value': paiseToNumber(totalValPaise),
+      'Rate': entry.rate,
+      'Taxable Value': paiseToNumber(entry.taxablePaise),
+      'Integrated Tax Amount': paiseToNumber(igstPaise),
+      'Central Tax Amount': paiseToNumber(cgstPaise),
+      'State/UT Tax Amount': paiseToNumber(sgstPaise),
+      'Cess Amount': 0,
+    };
+  });
+
+  return rows.sort((a, b) => a.HSN.localeCompare(b.HSN));
+}
+
+/**
+ * 7. Generates GSTR-1 Table 13 Documents Summary rows.
+ */
+export function buildGstr1DocsRows(invoices = []) {
+  if (invoices.length === 0) {
+    return [
+      {
+        'Nature of Document': 'Invoices for outward supply',
+        'Sr. No. From': '-',
+        'Sr. No. To': '-',
+        'Total Number': 0,
+        'Cancelled': 0,
+      },
+    ];
+  }
+
+  const sorted = [...invoices].sort((a, b) => (a.number || 0) - (b.number || 0));
+  const fromInv = sorted[0]?.invoice_no || '-';
+  const toInv = sorted[sorted.length - 1]?.invoice_no || '-';
+  const cancelledCount = invoices.filter((i) => i.status === 'cancelled').length;
+
+  return [
+    {
+      'Nature of Document': 'Invoices for outward supply',
+      'Sr. No. From': fromInv,
+      'Sr. No. To': toInv,
+      'Total Number': invoices.length,
+      'Cancelled': cancelledCount,
+    },
+  ];
+}
+
+/**
+ * 8. Exports auditor-ready GSTR-1 workbook (.xlsx) matching GST portal format.
+ */
+export async function exportGstr1Excel({ invoices = [], periodTitle = 'Monthly' }) {
+  const XLSX = await import('xlsx');
+  const wb = XLSX.utils.book_new();
+
+  // 1. b2b sheet
+  const b2bRows = buildGstr1B2bRows(invoices);
+  const wsB2b = XLSX.utils.json_to_sheet(b2bRows);
+  XLSX.utils.book_append_sheet(wb, wsB2b, 'b2b');
+
+  // 2. hsn sheet
+  const hsnRows = buildGstr1HsnRows(invoices);
+  const wsHsn = XLSX.utils.json_to_sheet(hsnRows);
+  XLSX.utils.book_append_sheet(wb, wsHsn, 'hsn');
+
+  // 3. docs sheet
+  const docsRows = buildGstr1DocsRows(invoices);
+  const wsDocs = XLSX.utils.json_to_sheet(docsRows);
+  XLSX.utils.book_append_sheet(wb, wsDocs, 'docs');
+
+  // Clean filename
+  const cleanTitle = periodTitle.replace(/[/\\:*?"<>|\s]/g, '_');
+  const filename = `Khansa_GSTR1_Portal_${cleanTitle}.xlsx`;
+
+  XLSX.writeFile(wb, filename);
+  return { success: true, filename };
+}

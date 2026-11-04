@@ -827,6 +827,34 @@ export default function NewBill() {
         }
       };
 
+      // Quick-update catalog item default prices if checked by user
+      const updateCatalogPricesIfNeeded = async () => {
+        try {
+          const linesToUpdate = lines.filter(
+            (l) => Boolean(l.update_catalog_price) && parseRupeesToPaise(l.rate) > 0
+          );
+          for (const l of linesToUpdate) {
+            const matched = itemsCatalog.find(
+              (it) =>
+                it.id === l.item_id ||
+                (l.description && it.description.trim().toLowerCase() === l.description.trim().toLowerCase())
+            );
+            if (matched) {
+              const newPaise = parseRupeesToPaise(l.rate);
+              await supabase
+                .from('items')
+                .update({ default_rate_paise: newPaise })
+                .eq('id', matched.id);
+              setItemsCatalog((prev) =>
+                prev.map((it) => (it.id === matched.id ? { ...it, default_rate_paise: newPaise } : it))
+              );
+            }
+          }
+        } catch (catErr) {
+          console.warn('Could not update catalog prices:', catErr);
+        }
+      };
+
       if (isEditMode) {
         // Edit mode: update existing invoice
         const { error: rpcErr } = await supabase.rpc('update_invoice', {
@@ -878,6 +906,9 @@ export default function NewBill() {
 
         // Webhook dispatch on bill edit
         sendBillEmailWebhook(existingInvoice?.invoice_no, true);
+
+        // Update catalog item default prices if checked
+        await updateCatalogPricesIfNeeded();
 
         setSaveModalOpen(false);
         navigate(`/bills/${editBillId}`);
@@ -971,6 +1002,9 @@ export default function NewBill() {
 
       // Webhook dispatch on bill create
       sendBillEmailWebhook(createdInvoice.invoice_no, false);
+
+      // Update catalog item default prices if checked
+      await updateCatalogPricesIfNeeded();
 
       // Successful save: clear draft and redirect to bill view
       try {
@@ -1636,6 +1670,45 @@ export default function NewBill() {
                       </span>
                     </div>
                   </div>
+
+                  {/* Item Unit Price Quick-Update Prompt */}
+                  {(() => {
+                    const linePaise = parseRupeesToPaise(line.rate);
+                    const matchedCatalogItem = itemsCatalog.find(
+                      (it) =>
+                        it.id === line.item_id ||
+                        (line.description &&
+                          it.description.trim().toLowerCase() === line.description.trim().toLowerCase())
+                    );
+                    if (
+                      matchedCatalogItem &&
+                      linePaise > 0 &&
+                      linePaise !== (matchedCatalogItem.default_rate_paise || 0)
+                    ) {
+                      const hasExistingPrice = Boolean(matchedCatalogItem.default_rate_paise);
+                      return (
+                        <div className="pt-2 border-t border-slate-100 mt-1">
+                          <label className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 text-xs font-semibold cursor-pointer hover:bg-amber-100/70 transition">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(line.update_catalog_price)}
+                              onChange={(e) =>
+                                handleUpdateLine(idx, 'update_catalog_price', e.target.checked)
+                              }
+                              className="w-4 h-4 rounded text-blue-600 border-amber-400 focus:ring-blue-500"
+                            />
+                            <span className="flex-1">
+                              <strong>Save {formatRupees(linePaise)} as catalog default</strong> for next time
+                              {hasExistingPrice
+                                ? ` (was ${formatRupees(matchedCatalogItem.default_rate_paise)})`
+                                : ' (no default price set)'}
+                            </span>
+                          </label>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               );
             })}
@@ -1798,6 +1871,12 @@ export default function NewBill() {
                 <span className="text-slate-900">Grand Total:</span>
                 <span className="font-mono text-blue-900">{formatRupees(calculatedInvoice.payablePaise)}</span>
               </div>
+              {lines.some((l) => l.update_catalog_price) && (
+                <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-300 text-xs font-semibold text-amber-950 flex items-center gap-2 mt-1">
+                  <span>⚡</span>
+                  <span>Will update catalog default price for <strong>{lines.filter((l) => l.update_catalog_price).length}</strong> item(s).</span>
+                </div>
+              )}
             </div>
 
             <div className="flex space-x-3 pt-2">

@@ -4,6 +4,9 @@ import {
   buildHardcopyStatementRows,
   buildGstRegisterRows,
   buildHsnSummaryRows,
+  buildGstr1B2bRows,
+  buildGstr1HsnRows,
+  buildGstr1DocsRows,
 } from './reports.js';
 
 describe('Month-End Reports Engine', () => {
@@ -139,5 +142,30 @@ describe('Month-End Reports Engine', () => {
     const hsn3402 = rows.find((r) => r['HSN / SAC'] === '3402');
     expect(hsn3402).toBeDefined();
     expect(hsn3402['Taxable Value (₹)']).toBe(2875.00);
+  });
+
+  it('builds official GSTR-1 B2B rows matching GST portal schema', () => {
+    const b2bRows = buildGstr1B2bRows(sampleInvoices);
+    expect(b2bRows.length).toBeGreaterThanOrEqual(2);
+
+    const firstRow = b2bRows[0];
+    expect(firstRow['GSTIN/UIN of Recipient']).toBe('33AAACR1714R1ZA');
+    expect(firstRow['Receiver Name']).toBe('KH EXPORT INDIA PRIVATE LTD');
+    expect(firstRow['Invoice Number']).toBe('046/25-26');
+    expect(firstRow['Reverse Charge']).toBe('N');
+    expect(firstRow['Invoice Type']).toBe('Regular');
+    expect(firstRow['Cess Amount']).toBe(0);
+  });
+
+  it('builds official GSTR-1 HSN summary and Documents summary', () => {
+    const hsnRows = buildGstr1HsnRows(sampleInvoices);
+    expect(hsnRows.length).toBeGreaterThanOrEqual(2);
+    expect(hsnRows[0]['UQC']).toMatch(/PCS|KGS|NOS/);
+
+    const docRows = buildGstr1DocsRows(sampleInvoices);
+    expect(docRows).toHaveLength(1);
+    expect(docRows[0]['Nature of Document']).toBe('Invoices for outward supply');
+    expect(docRows[0]['Total Number']).toBe(3);
+    expect(docRows[0]['Cancelled']).toBe(1);
   });
 });

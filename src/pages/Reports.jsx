@@ -8,7 +8,9 @@ import {
   buildGstRegisterRows,
   buildHsnSummaryRows,
   exportMonthEndExcel,
+  exportGstr1Excel,
 } from '../lib/reports.js';
+import { generateMonthlyPdfBooklet } from '../lib/monthlyPdfBooklet.js';
 
 const MONTH_NAMES = [
   { val: 'all', label: 'All Months' },
@@ -141,7 +143,10 @@ export default function Reports() {
     [filteredInvoices]
   );
 
-  // 5. Excel Export Trigger
+  const [exportingGstr1, setExportingGstr1] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+
+  // 5. Excel Export Trigger (Hardcopy Statement + GST Register + HSN)
   const handleExportExcel = async () => {
     setExporting(true);
     setExportMessage('');
@@ -165,6 +170,54 @@ export default function Reports() {
     }
   };
 
+  // 6. Auditor GSTR-1 Official Portal Excel Export (b2b, hsn, docs sheets)
+  const handleExportGstr1 = async () => {
+    setExportingGstr1(true);
+    setExportMessage('');
+    try {
+      const monthObj = MONTH_NAMES.find((m) => m.val === selectedMonth);
+      const monthTitle = monthObj ? monthObj.label : 'All';
+      const periodTitle = `FY_${selectedFy}_${monthTitle}`;
+
+      const res = await exportGstr1Excel({
+        invoices: filteredInvoices,
+        periodTitle,
+      });
+
+      setExportMessage(`Auditor GSTR-1 file ready: ${res.filename}! Matches official GST portal schema.`);
+      setTimeout(() => setExportMessage(''), 6000);
+    } catch (err) {
+      console.error('GSTR-1 export error:', err);
+      setExportMessage(`GSTR-1 export failed: ${err.message}`);
+    } finally {
+      setExportingGstr1(false);
+    }
+  };
+
+  // 7. Monthly Consolidated Bills PDF Booklet (All Invoices compiled into 1 PDF)
+  const handleExportMonthlyPdf = async () => {
+    setExportingPdf(true);
+    setExportMessage('');
+    try {
+      const monthObj = MONTH_NAMES.find((m) => m.val === selectedMonth);
+      const monthTitle = monthObj ? monthObj.label : 'All';
+      const periodTitle = `FY_${selectedFy}_${monthTitle}`;
+
+      const res = await generateMonthlyPdfBooklet({
+        invoices: filteredInvoices,
+        periodTitle,
+      });
+
+      setExportMessage(`Monthly PDF Booklet downloaded! Generated ${res.pageCount} pages in ${res.filename}.`);
+      setTimeout(() => setExportMessage(''), 6000);
+    } catch (err) {
+      console.error('Monthly PDF export error:', err);
+      setExportMessage(`PDF generation error: ${err.message}`);
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Header & Actions */}
@@ -174,32 +227,54 @@ export default function Reports() {
             Monthly GST Reports
           </h2>
           <p className="text-sm font-semibold text-slate-500">
-            Excel exports for Buyer Statement, GST Register &amp; HSN Summary
+            Auditor GSTR-1 Excel, Hardcopy Statement &amp; All-in-One Bills PDF Booklet
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Link
-            to="/reports/import"
-            className="min-h-[48px] px-4 py-2.5 rounded-2xl bg-white border-2 border-slate-300 text-slate-800 font-black text-sm hover:bg-slate-100 shadow-sm flex items-center justify-center space-x-2 transition cursor-pointer active:scale-95"
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Auditor GSTR-1 Portal Excel Button */}
+          <button
+            type="button"
+            onClick={handleExportGstr1}
+            disabled={exportingGstr1 || filteredInvoices.length === 0}
+            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-purple-700 text-white font-bold text-xs hover:bg-purple-800 disabled:opacity-40 shadow-sm flex items-center justify-center space-x-1.5 transition cursor-pointer active:scale-95"
+            title="Export official GSTR-1 Excel matching GST Portal format for your CA / Accountant"
           >
-            <svg className="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-            <span>Import Monthly Excel</span>
-          </Link>
+            <span>🏛️</span>
+            <span>{exportingGstr1 ? 'Generating...' : 'Auditor GSTR-1 (.xlsx)'}</span>
+          </button>
 
+          {/* Monthly Bills PDF Booklet Button */}
+          <button
+            type="button"
+            onClick={handleExportMonthlyPdf}
+            disabled={exportingPdf || filteredInvoices.length === 0}
+            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 disabled:opacity-40 shadow-sm flex items-center justify-center space-x-1.5 transition cursor-pointer active:scale-95"
+            title="Compile all bills of this month into a single multi-page A4 PDF booklet"
+          >
+            <span>📄</span>
+            <span>{exportingPdf ? 'Compiling PDF...' : 'Monthly Bills PDF Booklet'}</span>
+          </button>
+
+          {/* Hardcopy Excel Export Button */}
           <button
             type="button"
             onClick={handleExportExcel}
             disabled={exporting || filteredInvoices.length === 0}
-            className="min-h-[48px] px-5 py-2.5 rounded-2xl bg-emerald-700 text-white font-black text-sm hover:bg-emerald-800 disabled:opacity-40 shadow-sm flex items-center justify-center space-x-2 transition cursor-pointer active:scale-95"
+            className="min-h-[44px] px-3.5 py-2 rounded-xl bg-emerald-700 text-white font-bold text-xs hover:bg-emerald-800 disabled:opacity-40 shadow-sm flex items-center justify-center space-x-1.5 transition cursor-pointer active:scale-95"
           >
-            <svg className="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            <span>{exporting ? 'Exporting...' : 'Export to Excel (.xlsx)'}</span>
+            <span>📊</span>
+            <span>{exporting ? 'Exporting...' : 'Hardcopy Register (.xlsx)'}</span>
           </button>
+
+          {/* Import Legacy Excel Button */}
+          <Link
+            to="/reports/import"
+            className="min-h-[44px] px-3 py-2 rounded-xl bg-white border-2 border-slate-300 text-slate-800 font-bold text-xs hover:bg-slate-100 shadow-sm flex items-center justify-center space-x-1.5 transition cursor-pointer active:scale-95"
+          >
+            <span>📥</span>
+            <span>Import Excel</span>
+          </Link>
         </div>
       </div>
 
