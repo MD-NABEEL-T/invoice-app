@@ -70,14 +70,35 @@ export async function requestNotificationPermission() {
 }
 
 /**
- * Send a web notification if conditions match
+ * Send a web notification if conditions match.
+ * Uses ServiceWorkerRegistration.showNotification first (standard & required on Android / Chrome Mobile / PWA).
+ * Falls back to desktop window.Notification constructor.
  */
-export function sendBrowserNotification(title, options = {}) {
+export async function sendBrowserNotification(title, options = {}) {
   if (!isPushNotificationSupported()) return false;
   if (Notification.permission !== 'granted') return false;
 
+  // 1. Primary: Use Service Worker registration (Works on Android, Chrome Mobile, iOS 16.4+, and Desktop)
+  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg && typeof reg.showNotification === 'function') {
+        await reg.showNotification(title, {
+          icon: '/icons/icon-192.png',
+          badge: '/icons/icon-192.png',
+          vibrate: [200, 100, 200],
+          ...options,
+        });
+        return true;
+      }
+    } catch (swErr) {
+      console.warn('ServiceWorker showNotification notice:', swErr);
+    }
+  }
+
+  // 2. Fallback for Desktop browsers without active Service Worker
   try {
-    const notif = new Notification(title, {
+    new Notification(title, {
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
       requireInteraction: true,
@@ -85,7 +106,7 @@ export function sendBrowserNotification(title, options = {}) {
     });
     return true;
   } catch (err) {
-    console.warn('Browser notification error:', err);
+    console.warn('Browser notification fallback error:', err);
     return false;
   }
 }
@@ -93,7 +114,7 @@ export function sendBrowserNotification(title, options = {}) {
 /**
  * Checks today's reminder and fires a browser notification if not already sent today.
  */
-export function checkAndNotifyGstReminders() {
+export async function checkAndNotifyGstReminders() {
   const reminder = getGstReminder();
   if (!reminder) return null;
 
@@ -101,11 +122,13 @@ export function checkAndNotifyGstReminders() {
   try {
     const alreadyNotified = localStorage.getItem(todayKey);
     if (!alreadyNotified && isPushNotificationSupported() && Notification.permission === 'granted') {
-      sendBrowserNotification(reminder.title, {
+      const sent = await sendBrowserNotification(reminder.title, {
         body: reminder.message,
         tag: `gst-reminder-${reminder.type}`,
       });
-      localStorage.setItem(todayKey, 'true');
+      if (sent) {
+        localStorage.setItem(todayKey, 'true');
+      }
     }
   } catch (e) {
     // ignore localStorage error
@@ -118,7 +141,7 @@ export function checkAndNotifyGstReminders() {
  * Daily sales notification helper:
  * Fires a reminder notification if 0 bills have been created today.
  */
-export function checkAndNotifyDailySales(todayCount) {
+export async function checkAndNotifyDailySales(todayCount) {
   if (todayCount !== 0) return false;
 
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -127,12 +150,14 @@ export function checkAndNotifyDailySales(todayCount) {
   try {
     const alreadyNotified = localStorage.getItem(todayKey);
     if (!alreadyNotified && isPushNotificationSupported() && Notification.permission === 'granted') {
-      sendBrowserNotification('No Bills Created Today', {
+      const sent = await sendBrowserNotification('No Bills Created Today', {
         body: `Reminder: You have not created any bills yet today (${todayStr}).`,
         tag: 'daily-sales-reminder',
       });
-      localStorage.setItem(todayKey, 'true');
-      return true;
+      if (sent) {
+        localStorage.setItem(todayKey, 'true');
+        return true;
+      }
     }
   } catch (e) {
     // ignore

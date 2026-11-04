@@ -44,9 +44,9 @@ describe('GST Reminders Logic', () => {
     expect(getGstReminder(new Date('2026-11-25T10:00:00'))).toBeNull();
   });
 
-  it('checkAndNotifyDailySales returns false if bills were created today (count > 0)', () => {
-    expect(checkAndNotifyDailySales(3)).toBe(false);
-    expect(checkAndNotifyDailySales(1)).toBe(false);
+  it('checkAndNotifyDailySales returns false if bills were created today (count > 0)', async () => {
+    expect(await checkAndNotifyDailySales(3)).toBe(false);
+    expect(await checkAndNotifyDailySales(1)).toBe(false);
   });
 });
 

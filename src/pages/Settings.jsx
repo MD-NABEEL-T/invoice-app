@@ -196,7 +196,7 @@ export default function Settings() {
       await subscribeToPushNotifications();
       setNotifPermission('granted');
       setNotifMsg('✓ Push notifications enabled! This device will receive automated reminders at 10:00 PM if no bills were created today, even when the app is closed.');
-      sendBrowserNotification('Khansa Invoices - Notifications Active', {
+      await sendBrowserNotification('Khansa Invoices - Notifications Active', {
         body: 'Automatic 10:00 PM daily sales reminders and monthly GST alerts are now active on this device.',
       });
     } catch (err) {
@@ -211,8 +211,8 @@ export default function Settings() {
     setTimeout(() => setNotifMsg(''), 6000);
   };
 
-  const handleSendTestDailyNotif = () => {
-    const sent = sendBrowserNotification('No sales today? ,no bills created', {
+  const handleSendTestDailyNotif = async () => {
+    const sent = await sendBrowserNotification('No sales today? ,no bills created', {
       body: `Reminder: No bills have been recorded yet for today (${new Date().toLocaleDateString('en-GB')}). Tap to create one.`,
       tag: 'khansa-daily-no-sales',
       data: { url: '/new' },
@@ -220,19 +220,19 @@ export default function Settings() {
     if (sent) {
       setNotifMsg('✓ Test 10:00 PM notification sent! (Check your system tray or mobile notification bar)');
     } else {
-      setNotifMsg('Could not send notification. Please click "Enable Push Notifications" first.');
+      setNotifMsg('Could not send notification. Please check that browser notifications are allowed in phone settings.');
     }
     setTimeout(() => setNotifMsg(''), 5000);
   };
 
-  const handleSendTestNotif = () => {
-    const sent = sendBrowserNotification('Khansa Invoices - Test Reminder', {
+  const handleSendTestNotif = async () => {
+    const sent = await sendBrowserNotification('Khansa Invoices - Test Reminder', {
       body: 'This is a test notification for GST Reminders (8th: GSTR-1, 19th: GSTR-3B).',
     });
     if (sent) {
-      setNotifMsg('Test notification sent!');
+      setNotifMsg('✓ Test notification sent! (Check your notification bar)');
     } else {
-      setNotifMsg('Could not send notification. Please enable permission first.');
+      setNotifMsg('Could not send notification. Please check that browser notifications are allowed in phone settings.');
     }
     setTimeout(() => setNotifMsg(''), 4000);
   };
