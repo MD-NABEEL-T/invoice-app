@@ -1,26 +1,42 @@
-name: Supabase Keep-Alive Ping
+name: Daily 10 PM Sales Check & Supabase Keep-Alive
 
 on:
   schedule:
-    # Runs twice every day (at 04:00 UTC and 16:00 UTC) to prevent Supabase from pausing after 7 days
-    - cron: '0 4,16 * * *'
-  workflow_dispatch: # Allows manual trigger from GitHub Actions UI
+    # 16:30 UTC is exactly 22:00 IST (10:00 PM Indian Standard Time) every single day
+    - cron: '30 16 * * *'
+    # 04:00 UTC is 09:30 AM IST for morning database keep-alive
+    - cron: '0 4 * * *'
+  workflow_dispatch: # Allows manual trigger anytime from GitHub Actions UI
 
 jobs:
-  ping:
+  daily-sales-and-keepalive:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase Database
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Daily Sales 10 PM Check & Push Dispatcher
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://rgphmteuhxxkqnoharvz.supabase.co' }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_-rJWi_MtK66PVNOoacl1_g_qKSUBEIh' }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY || 'BP6nRYXoL5a-C6UYDP0aZsCRIlPq9J6NemBODwKZIozvuia0R7Q2dpUdnQXD8Z79N5m_EE1z_8TIqhJ-2p4NsKU' }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY || 'GHx8v6-RcW8vcFKKfsdevjNLzNQOjfN_O4BB4k-H6bM' }}
+          GSHEET_WEBHOOK_URL: ${{ secrets.GSHEET_WEBHOOK_URL }}
+        run: node scripts/daily-sales-check.mjs
+
+      - name: Fallback Direct Keep-Alive Ping
         run: |
-          echo "Pinging Supabase at https://rgphmteuhxxkqnoharvz.supabase.co to keep database active..."
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+          echo "Pinging Supabase counters..."
+          curl -s -f -o /dev/null \
             -H "apikey: sb_publishable_-rJWi_MtK66PVNOoacl1_g_qKSUBEIh" \
             -H "Authorization: Bearer sb_publishable_-rJWi_MtK66PVNOoacl1_g_qKSUBEIh" \
-            "https://rgphmteuhxxkqnoharvz.supabase.co/rest/v1/counters?select=fy&limit=1")
-          echo "HTTP Response Status: $STATUS"
-          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
-            echo "Keep-alive ping successful. Supabase database is active."
-          else
-            echo "Warning: Received HTTP $STATUS"
-          fi
-
+            "https://rgphmteuhxxkqnoharvz.supabase.co/rest/v1/counters?select=fy&limit=1" || true

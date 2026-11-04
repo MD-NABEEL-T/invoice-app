@@ -74,6 +74,7 @@ export default defineConfig({
         ],
       },
       workbox: {
+        importScripts: ['/custom-sw.js'],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
         navigateFallbackDenylist: [/^\/api/, /supabase\.co/],
         runtimeCaching: [

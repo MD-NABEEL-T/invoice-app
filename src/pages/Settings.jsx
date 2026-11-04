@@ -5,6 +5,7 @@ import { financialYear, formatInvoiceNo } from '../lib/tax.js';
 import { validateGSTIN } from '../lib/itemValidation.js';
 import { pingDatabase, getLastPingTimestamp } from '../lib/keepAlive.js';
 import { isPushNotificationSupported, requestNotificationPermission, sendBrowserNotification } from '../lib/gstReminders.js';
+import { subscribeToPushNotifications, getPushSubscriptionState } from '../lib/pushSubscription.js';
 
 export default function Settings() {
   const currentFy = financialYear(new Date());
@@ -72,11 +73,22 @@ export default function Settings() {
   });
   const [webhookStatus, setWebhookStatus] = useState('');
 
-  const handleSaveWebhook = (e) => {
+  const handleSaveWebhook = async (e) => {
     e.preventDefault();
     try {
       localStorage.setItem('khansa_gsheet_webhook_url', webhookUrl.trim());
       localStorage.setItem('khansa_notification_email', notificationEmail.trim());
+
+      // Safely sync to Supabase app_settings so cloud cron runner can access it
+      try {
+        await supabase.from('app_settings').upsert([
+          { key: 'khansa_gsheet_webhook_url', value: webhookUrl.trim(), updated_at: new Date().toISOString() },
+          { key: 'khansa_notification_email', value: notificationEmail.trim(), updated_at: new Date().toISOString() },
+        ]);
+      } catch (dbErr) {
+        // graceful fallback if table not yet created
+      }
+
       setWebhookStatus('Automation & Email settings saved successfully!');
       setTimeout(() => setWebhookStatus(''), 4000);
     } catch (err) {
@@ -142,15 +154,35 @@ export default function Settings() {
   const [notifMsg, setNotifMsg] = useState('');
 
   const handleRequestNotif = async () => {
-    const res = await requestNotificationPermission();
-    setNotifPermission(res);
-    if (res === 'granted') {
-      setNotifMsg('Push notifications enabled successfully!');
-      sendBrowserNotification('Khansa Invoices - Notifications Enabled', {
-        body: 'You will receive monthly GST reminders on the 8th (GSTR-1) and 19th (GSTR-3B).',
+    try {
+      await subscribeToPushNotifications();
+      setNotifPermission('granted');
+      setNotifMsg('✓ Push notifications enabled! This device will receive automated reminders at 10:00 PM if no bills were created today, even when the app is closed.');
+      sendBrowserNotification('Khansa Invoices - Notifications Active', {
+        body: 'Automatic 10:00 PM daily sales reminders and monthly GST alerts are now active on this device.',
       });
-    } else if (res === 'denied') {
-      setNotifMsg('Notifications permission was blocked in browser settings.');
+    } catch (err) {
+      const res = await requestNotificationPermission();
+      setNotifPermission(res);
+      if (res === 'granted') {
+        setNotifMsg('Notifications permission granted!');
+      } else {
+        setNotifMsg(`Notification permission note: ${err.message || 'Permission blocked in browser settings'}`);
+      }
+    }
+    setTimeout(() => setNotifMsg(''), 6000);
+  };
+
+  const handleSendTestDailyNotif = () => {
+    const sent = sendBrowserNotification('No sales today? ,no bills created', {
+      body: `Reminder: No bills have been recorded yet for today (${new Date().toLocaleDateString('en-GB')}). Tap to create one.`,
+      tag: 'khansa-daily-no-sales',
+      data: { url: '/new' },
+    });
+    if (sent) {
+      setNotifMsg('✓ Test 10:00 PM notification sent! (Check your system tray or mobile notification bar)');
+    } else {
+      setNotifMsg('Could not send notification. Please click "Enable Push Notifications" first.');
     }
     setTimeout(() => setNotifMsg(''), 5000);
   };
@@ -989,15 +1021,15 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* CARD 6: GST FILING & PAYMENT REMINDERS (PUSH NOTIFICATIONS) */}
+      {/* CARD 6: AUTOMATIC 10:00 PM DAILY SALES NOTIFICATION & GST REMINDERS */}
       <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-4">
         <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Compliance Alerts
+              Automatic Reminders &amp; Push Alerts
             </span>
             <h3 className="text-xl font-black text-slate-900 mt-0.5">
-              Monthly GST Reminders &amp; Push Notifications
+              Daily 10:00 PM Sales Check &amp; Compliance Alerts
             </h3>
           </div>
           <span
@@ -1012,25 +1044,34 @@ export default function Settings() {
         </div>
 
         <p className="text-xs font-medium text-slate-600 leading-relaxed">
-          Automated reminders ensure you never miss statutory GST deadlines:
+          Automated background alerts arrive even if the app is <strong>completely closed</strong> and has not been opened all day:
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl">
+            <span className="font-black text-amber-900 uppercase tracking-wide block mb-1">
+              ⏰ Daily at 10:00 PM IST
+            </span>
+            <p className="font-semibold text-amber-950">
+              <strong>Daily Sales Check:</strong> If 0 bills were created today by 10:00 PM, an alert <em>&quot;No sales today? ,no bills created&quot;</em> automatically rings your phone/device.
+            </p>
+          </div>
+
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
             <span className="font-black text-blue-900 uppercase tracking-wide block mb-1">
               📅 8th of every month
             </span>
             <p className="font-semibold text-blue-950">
-              <strong>GSTR-1 Sales Filing Reminder:</strong> Reminder to finalize invoices before the 11th filing deadline.
+              <strong>GSTR-1 Filing Reminder:</strong> Reminder to finalize invoices before the 11th filing deadline.
             </p>
           </div>
 
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
-            <span className="font-black text-amber-900 uppercase tracking-wide block mb-1">
+          <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl">
+            <span className="font-black text-purple-900 uppercase tracking-wide block mb-1">
               💰 19th of every month
             </span>
-            <p className="font-semibold text-amber-950">
-              <strong>GSTR-3B Tax Payment Reminder:</strong> Reminder that monthly tax payment and GSTR-3B return are due tomorrow (20th).
+            <p className="font-semibold text-purple-950">
+              <strong>GSTR-3B Tax Payment:</strong> Reminder that monthly tax payment and GSTR-3B return are due tomorrow (20th).
             </p>
           </div>
         </div>
@@ -1046,18 +1087,27 @@ export default function Settings() {
             <button
               type="button"
               onClick={handleRequestNotif}
-              className="px-5 py-2.5 rounded-xl bg-blue-700 text-white font-bold text-xs hover:bg-blue-800 cursor-pointer"
+              className="px-5 py-2.5 rounded-xl bg-blue-700 text-white font-bold text-xs hover:bg-blue-800 cursor-pointer shadow-sm"
             >
-              🔔 Enable Push Notifications
+              🔔 Enable 10:00 PM Daily Phone Push Notifications
             </button>
           ) : (
-            <button
-              type="button"
-              onClick={handleSendTestNotif}
-              className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 cursor-pointer"
-            >
-              Test Browser Notification
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={handleSendTestDailyNotif}
+                className="px-4 py-2 rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs cursor-pointer shadow-sm"
+              >
+                🔔 Test &quot;No sales today?&quot; Notification
+              </button>
+              <button
+                type="button"
+                onClick={handleSendTestNotif}
+                className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 cursor-pointer"
+              >
+                📅 Test GST Reminder
+              </button>
+            </>
           )}
         </div>
       </div>
