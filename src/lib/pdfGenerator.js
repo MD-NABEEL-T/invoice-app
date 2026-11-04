@@ -1,6 +1,9 @@
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas-pro';
+
 /**
- * Lazy-loaded PDF generator using jsPDF and html2canvas.
- * Keeping imports dynamic ensures main app bundle size remains lean.
+ * PDF generator using jsPDF and html2canvas.
+ * Statically bundled so dynamic chunk fetching never fails across PWA updates or offline usage.
  */
 
 /**
@@ -17,13 +20,6 @@ export async function generateInvoicePdfBlob(pageElements, { scale = 2, jpegQual
   if (elements.length === 0) {
     throw new Error('No invoice page elements provided for PDF generation');
   }
-
-  // Lazy-load libraries on-demand
-  const [{ jsPDF }, html2canvasModule] = await Promise.all([
-    import('jspdf'),
-    import('html2canvas-pro'),
-  ]);
-  const html2canvas = html2canvasModule.default || html2canvasModule;
 
   // A4 portrait: 210mm x 297mm
   const pdf = new jsPDF({

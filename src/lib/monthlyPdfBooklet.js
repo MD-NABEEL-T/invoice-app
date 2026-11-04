@@ -1,3 +1,4 @@
+import { jsPDF } from 'jspdf';
 import { paiseToRupees } from './tax.js';
 import { formatDisplayDate } from './billUtils.js';
 import { formatMilliToQuantity, numberToWordsIndian } from './billPayload.js';
@@ -27,8 +28,6 @@ export async function generateMonthlyPdfBooklet({
     ifsc: 'IOBA0000054',
   },
 }) {
-  const { jsPDF } = await import('jspdf');
-
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',

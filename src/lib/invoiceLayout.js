@@ -185,9 +185,9 @@ export function getCopyLabel(copyIndex = 0, isEnabled = false) {
  * @returns {Array<{ pageIndex: number, pageNumber: number, totalPages: number, isFirst: boolean, isLast: boolean, lines: Array }>}
  */
 export function paginateInvoiceLines(lines = [], {
-  singlePageCapacity = 8,
+  singlePageCapacity = 10,
   middlePageCapacity = 14,
-  lastPageCapacity = 7,
+  lastPageCapacity = 8,
 } = {}) {
   const allLines = Array.isArray(lines) ? lines : [];
 

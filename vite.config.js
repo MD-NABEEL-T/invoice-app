@@ -75,6 +75,7 @@ export default defineConfig({
         ],
       },
       workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         importScripts: ['/custom-sw.js'],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}'],
         navigateFallbackDenylist: [/^\/api/, /supabase\.co/],

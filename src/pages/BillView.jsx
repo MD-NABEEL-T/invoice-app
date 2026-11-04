@@ -26,8 +26,13 @@ export default function BillView() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState('');
 
-  // View mode: 'cards' or 'preview'
-  const [viewMode, setViewMode] = useState('cards');
+  // View mode: 'cards' or 'preview'. Defaults to 'preview' (A4 Invoice) on tablet/laptop/desktop
+  const [viewMode, setViewMode] = useState(() => {
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      return 'preview';
+    }
+    return 'cards';
+  });
 
   // Print & PDF modal state
   const [showPrintModal, setShowPrintModal] = useState(false);

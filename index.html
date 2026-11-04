@@ -17,6 +17,12 @@
   </head>
   <body class="bg-slate-50 text-slate-900 min-h-screen">
     <div id="root"></div>
+    <script>
+      // Automatically refresh stale client tabs when new code hashes are deployed
+      window.addEventListener('vite:preloadError', () => {
+        window.location.reload();
+      });
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

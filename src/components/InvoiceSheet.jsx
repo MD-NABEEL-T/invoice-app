@@ -129,9 +129,9 @@ export function InvoicePage({
   const hsnSummary = isLast ? getHsnSummaryRows(invoice?.lines || []) : null;
   const isCancelled = invoice?.status === 'cancelled';
 
-  // Spacer rows: for bills with few items, add 2-3 spacer rows to maintain natural proportion
-  const targetRowCount = isLast ? 4 : 10;
-  const emptyRowCount = Math.max(0, targetRowCount - lines.length);
+  // Spacer rows: for bills with 1-2 items, add 1-2 rows for natural proportion,
+  // but keep 0 spacer rows for bills with 3+ items so the invoice is guaranteed to fit on 1 single A4 page.
+  const emptyRowCount = isLast && lines.length <= 2 ? Math.max(0, 3 - lines.length) : 0;
 
   return (
     <div
@@ -197,7 +197,23 @@ export function InvoicePage({
           backgroundColor: '#ffffff',
         }}
       >
-        {/* 1. Header Grid: Left (Firm + Buyer) and Right (Tax Invoice + Details) */}
+        {/* Full-Width TAX INVOICE Title Header Bar Matching Excel */}
+        <div
+          className="py-1 text-center"
+          style={{
+            borderBottom: '1px solid #000000',
+            backgroundColor: '#ffffff',
+          }}
+        >
+          <h1
+            className="text-[14px] font-black uppercase tracking-wider m-0"
+            style={{ color: '#000000' }}
+          >
+            TAX INVOICE
+          </h1>
+        </div>
+
+        {/* 1. Header Grid: Left (Firm + Buyer) and Right (Details) */}
         <div className="flex" style={{ borderBottom: '1px solid #000000', display: 'flex' }}>
           {/* Left Column (58% width): Firm Profile on top, Buyer details below */}
           <div
@@ -210,20 +226,20 @@ export function InvoicePage({
             }}
           >
             {/* Firm Details */}
-            <div className="p-2 sm:p-2.5">
+            <div className="p-2">
               <h2
-                className="text-[15px] font-black uppercase tracking-wide leading-tight mb-1"
+                className="text-[14px] font-black uppercase tracking-wide leading-tight mb-1"
                 style={{ color: '#000000', fontFamily: 'Arial, Calibri, sans-serif' }}
               >
                 {firm.name || 'KHANSA ENTERPRISES'}
               </h2>
               <div
-                className="text-[12px] whitespace-pre-line leading-tight font-medium"
+                className="text-[11.5px] whitespace-pre-line leading-tight font-medium"
                 style={{ color: '#000000' }}
               >
                 {firm.address}
               </div>
-              <div className="text-[12px] font-semibold pt-1 leading-snug" style={{ color: '#000000' }}>
+              <div className="text-[11.5px] font-semibold pt-1 leading-snug" style={{ color: '#000000' }}>
                 <p>
                   <span className="font-bold">GSTIN/UIN:</span> {firm.gstin || '33AGXPF4947Q1ZH'}
                 </p>
@@ -242,57 +258,41 @@ export function InvoicePage({
 
             {/* Buyer Section */}
             <div
-              className="p-2 sm:p-2.5"
+              className="p-2"
               style={{
                 borderTop: '1px solid #000000',
               }}
             >
-              <span className="text-[12px] font-bold block" style={{ color: '#000000' }}>
+              <span className="text-[11.5px] font-bold block" style={{ color: '#000000' }}>
                 Buyer:
               </span>
-              <p className="text-[13px] font-black uppercase leading-tight mb-0.5" style={{ color: '#000000' }}>
+              <p className="text-[12.5px] font-black uppercase leading-tight mb-0.5" style={{ color: '#000000' }}>
                 {invoice.buyer_name}
               </p>
               <div
-                className="text-[12px] whitespace-pre-line leading-tight font-medium"
+                className="text-[11.5px] whitespace-pre-line leading-tight font-medium"
                 style={{ color: '#000000' }}
               >
                 {invoice.buyer_address}
               </div>
               {invoice.buyer_gstin && (
-                <p className="text-[12px] font-bold pt-1" style={{ color: '#000000' }}>
+                <p className="text-[11.5px] font-bold pt-1" style={{ color: '#000000' }}>
                   GSTIN: {invoice.buyer_gstin}
                 </p>
               )}
             </div>
           </div>
 
-          {/* Right Column (42% width): TAX INVOICE title & Reference Metadata Grid */}
+          {/* Right Column (42% width): Reference Metadata Grid */}
           <div
             style={{
               width: '42%',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              fontSize: '12px',
+              fontSize: '11.5px',
             }}
           >
-            {/* Top Cell: TAX INVOICE Title */}
-            <div
-              className="py-1 px-2 text-center"
-              style={{
-                borderBottom: '1px solid #000000',
-                backgroundColor: '#ffffff',
-              }}
-            >
-              <h1
-                className="text-[15px] font-black uppercase tracking-wider m-0"
-                style={{ color: '#000000' }}
-              >
-                TAX INVOICE
-              </h1>
-            </div>
-
             {/* Row 1: INVOICE No & Dated */}
             <div className="flex" style={{ borderBottom: '1px solid #000000', display: 'flex' }}>
               <div className="w-1/2 p-1.5" style={{ borderRight: '1px solid #000000' }}>
@@ -342,7 +342,7 @@ export function InvoicePage({
             </div>
 
             {/* Row 4: Despatched through & Destination */}
-            <div className="flex" style={{ borderBottom: '1px solid #000000', display: 'flex' }}>
+            <div className="flex" style={{ display: 'flex' }}>
               <div className="w-1/2 p-1.5" style={{ borderRight: '1px solid #000000' }}>
                 <span className="font-bold block" style={{ color: '#000000' }}>Despatched through:</span>
                 <span className="font-semibold block" style={{ color: '#000000' }}>
@@ -355,14 +355,6 @@ export function InvoicePage({
                   {invoice.destination || '-'}
                 </span>
               </div>
-            </div>
-
-            {/* Row 5: Terms of Delivery */}
-            <div className="p-1.5" style={{ minHeight: '26px' }}>
-              <span className="font-bold mr-1" style={{ color: '#000000' }}>Terms of Delivery:</span>
-              <span className="font-semibold" style={{ color: '#000000' }}>
-                {invoice.terms_of_delivery || ''}
-              </span>
             </div>
           </div>
         </div>
@@ -684,10 +676,10 @@ export function InvoicePage({
           {firm.declaration || DEFAULT_FIRM.declaration}
         </div>
 
-        {/* 6. Signature Block: Sits comfortably right below the declaration matching Image 2 */}
-        <div className="p-3 bg-white" style={{ minHeight: '90px' }}>
+        {/* 6. Signature Block: Sits comfortably right below the declaration matching Excel */}
+        <div className="p-2.5 bg-white" style={{ minHeight: '75px' }}>
           {/* Top of Signature: "For Khansa Enterprises" right-aligned */}
-          <div className="text-right mb-7">
+          <div className="text-right mb-5">
             <span className="text-[12px] font-bold uppercase tracking-wider" style={{ color: '#000000' }}>
               For {firm.name || 'Khansa Enterprises'}
             </span>

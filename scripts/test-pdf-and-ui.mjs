@@ -117,7 +117,7 @@ async function runTest() {
 
     // Check CSS computed styles on Home page
     const homeStyles = await page.evaluate(() => {
-      const newBillBtn = document.querySelector('a[href="/new"]');
+      const newBillBtn = document.querySelector('a.btn-brand') || document.querySelector('.btn-brand') || document.querySelector('a[href="/new"]');
       const style = window.getComputedStyle(newBillBtn);
       const bodyStyle = window.getComputedStyle(document.body);
       return {
