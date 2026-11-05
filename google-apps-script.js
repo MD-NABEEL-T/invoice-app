@@ -151,6 +151,7 @@ function buildNotificationEmailHtml(data, action) {
     const qty = l.quantity || l.qty || 1;
     const rate = l.rate || (l.rate_paise ? (l.rate_paise / 100).toFixed(2) : '0.00');
     const amt = l.amount_rupees || l.amount || (l.amount_paise ? (l.amount_paise / 100).toFixed(2) : '0.00');
+    const itemFreight = Number(l.freight_rupees || (l.freight_paise ? (l.freight_paise / 100) : 0));
 
     rowsHtml +=
       '<tr style="border-bottom: 1px solid #e2e8f0;">' +
@@ -161,6 +162,18 @@ function buildNotificationEmailHtml(data, action) {
         '<td style="padding: 10px 8px; text-align: right; color: #0f172a; font-size: 13px;">Rs. ' + rate + '</td>' +
         '<td style="padding: 10px 8px; text-align: right; font-weight: bold; color: #0f172a; font-size: 13px;">Rs. ' + amt + '</td>' +
       '</tr>';
+
+    if (itemFreight > 0) {
+      rowsHtml +=
+        '<tr style="border-bottom: 1px solid #e2e8f0; background: #fafafa;">' +
+          '<td style="padding: 10px 8px; text-align: center; color: #94a3b8; font-size: 13px;"></td>' +
+          '<td style="padding: 10px 8px; font-weight: 500; color: #475569; font-size: 13px; font-style: italic;">Freight</td>' +
+          '<td style="padding: 10px 8px; text-align: center; color: #64748b; font-size: 13px;">' + (l.hsn || '-') + '</td>' +
+          '<td style="padding: 10px 8px; text-align: right; color: #94a3b8; font-size: 13px;">-</td>' +
+          '<td style="padding: 10px 8px; text-align: right; color: #64748b; font-size: 13px;">' + (l.gst_percent ? l.gst_percent + '%' : '-') + '</td>' +
+          '<td style="padding: 10px 8px; text-align: right; font-weight: 600; color: #0f172a; font-size: 13px;">Rs. ' + itemFreight.toFixed(2) + '</td>' +
+        '</tr>';
+    }
   }
 
   return (

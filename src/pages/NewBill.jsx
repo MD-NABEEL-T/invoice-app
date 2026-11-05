@@ -881,6 +881,7 @@ export default function NewBill() {
             const qtyMilli = parseQuantityToMilli(l.quantity);
             const ratePaise = parseRupeesToPaise(l.rate);
             const lineTotalPaise = Math.round((qtyMilli * ratePaise) / 1000);
+            const lineFreightPaise = Number(l.freight_paise || parseRupeesToPaise(l.freight) || 0);
             return {
               description: l.description,
               hsn: l.hsn,
@@ -889,6 +890,8 @@ export default function NewBill() {
               rate: l.rate,
               gst_percent: l.gst_percent,
               amount_rupees: (lineTotalPaise / 100).toFixed(2),
+              freight_rupees: (lineFreightPaise / 100).toFixed(2),
+              freight_paise: lineFreightPaise,
             };
           }),
           email_to: emailTo,
