@@ -148,7 +148,7 @@ function buildNotificationEmailHtml(data, action) {
     const l = lines[i];
     const qty = l.quantity || l.qty || 1;
     const rate = l.rate || (l.rate_paise ? (l.rate_paise / 100).toFixed(2) : '0.00');
-    const amt = l.amount || (l.amount_paise ? (l.amount_paise / 100).toFixed(2) : '0.00');
+    const amt = l.amount_rupees || l.amount || (l.amount_paise ? (l.amount_paise / 100).toFixed(2) : '0.00');
 
     rowsHtml +=
       '<tr style="border-bottom: 1px solid #e2e8f0;">' +
