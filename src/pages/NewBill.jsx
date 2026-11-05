@@ -292,26 +292,30 @@ export default function NewBill() {
         if (inv.despatched_through) setDespatchedThrough(String(inv.despatched_through));
         if (inv.destination) setDestination(String(inv.destination));
         if (inv.terms_of_delivery) setTermsOfDelivery(String(inv.terms_of_delivery));
-        if (inv.freight_paise) setFreightAmount(paiseToRupees(inv.freight_paise));
-        else if (inv.freight) setFreightAmount(String(inv.freight));
-
         if (Array.isArray(inv.lines) && inv.lines.length > 0) {
           const sorted = [...inv.lines].sort((a, b) => (a.line_no || 0) - (b.line_no || 0));
-          const mapped = sorted.map((l) => ({
-            id: l.id || Math.random().toString(),
-            item_id: null,
-            description: l.description,
-            hsn: l.hsn || '',
-            gst_percent: String(l.gst_percent ?? 18),
-            unit: l.unit || 'PCS',
-            quantity: formatMilliToQuantity(l.qty_milli),
-            rate: paiseToRupees(l.rate_paise),
-            rate_paise: Number(l.rate_paise || 0),
-            qty_milli: Number(l.qty_milli || 0),
-            freight: l.freight_paise ? paiseToRupees(l.freight_paise) : '',
-            freight_paise: Number(l.freight_paise || 0),
-          }));
+          const hasAnyItemFreight = sorted.some((l) => Number(l.freight_paise || 0) > 0);
+          const legacyBillFreightPaise = !hasAnyItemFreight ? Number(inv.freight_paise || 0) : 0;
+
+          const mapped = sorted.map((l, idx) => {
+            const lineFreightPaise = Number(l.freight_paise || (idx === 0 ? legacyBillFreightPaise : 0));
+            return {
+              id: l.id || Math.random().toString(),
+              item_id: null,
+              description: l.description,
+              hsn: l.hsn || '',
+              gst_percent: String(l.gst_percent ?? 18),
+              unit: l.unit || 'PCS',
+              quantity: formatMilliToQuantity(l.qty_milli),
+              rate: paiseToRupees(l.rate_paise),
+              rate_paise: Number(l.rate_paise || 0),
+              qty_milli: Number(l.qty_milli || 0),
+              freight: lineFreightPaise > 0 ? paiseToRupees(lineFreightPaise) : '',
+              freight_paise: lineFreightPaise,
+            };
+          });
           setLines(mapped);
+          setFreightAmount('');
         }
       } catch (err) {
         console.error('Error loading bill for edit:', err);
@@ -363,26 +367,30 @@ export default function NewBill() {
         if (inv.despatched_through) setDespatchedThrough(String(inv.despatched_through));
         if (inv.destination) setDestination(String(inv.destination));
         if (inv.terms_of_delivery) setTermsOfDelivery(String(inv.terms_of_delivery));
-        if (inv.freight_paise) setFreightAmount(paiseToRupees(inv.freight_paise));
-        else if (inv.freight) setFreightAmount(String(inv.freight));
-
         if (Array.isArray(inv.lines) && inv.lines.length > 0) {
           const sorted = [...inv.lines].sort((a, b) => (a.line_no || 0) - (b.line_no || 0));
-          const mapped = sorted.map((l) => ({
-            id: Math.random().toString(),
-            item_id: null,
-            description: l.description,
-            hsn: l.hsn || '',
-            gst_percent: String(l.gst_percent ?? 18),
-            unit: l.unit || 'PCS',
-            quantity: formatMilliToQuantity(l.qty_milli),
-            rate: paiseToRupees(l.rate_paise),
-            rate_paise: Number(l.rate_paise || 0),
-            qty_milli: Number(l.qty_milli || 0),
-            freight: l.freight_paise ? paiseToRupees(l.freight_paise) : '',
-            freight_paise: Number(l.freight_paise || 0),
-          }));
+          const hasAnyItemFreight = sorted.some((l) => Number(l.freight_paise || 0) > 0);
+          const legacyBillFreightPaise = !hasAnyItemFreight ? Number(inv.freight_paise || 0) : 0;
+
+          const mapped = sorted.map((l, idx) => {
+            const lineFreightPaise = Number(l.freight_paise || (idx === 0 ? legacyBillFreightPaise : 0));
+            return {
+              id: Math.random().toString(),
+              item_id: null,
+              description: l.description,
+              hsn: l.hsn || '',
+              gst_percent: String(l.gst_percent ?? 18),
+              unit: l.unit || 'PCS',
+              quantity: formatMilliToQuantity(l.qty_milli),
+              rate: paiseToRupees(l.rate_paise),
+              rate_paise: Number(l.rate_paise || 0),
+              qty_milli: Number(l.qty_milli || 0),
+              freight: lineFreightPaise > 0 ? paiseToRupees(lineFreightPaise) : '',
+              freight_paise: lineFreightPaise,
+            };
+          });
           setLines(mapped);
+          setFreightAmount('');
         }
       } catch (err) {
         console.error('Error copying bill:', err);
@@ -1786,9 +1794,9 @@ export default function NewBill() {
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                        Freight (₹) <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                    <div className="bg-amber-50/70 p-2 rounded-xl border border-amber-200">
+                      <label className="block text-xs font-bold text-amber-900 uppercase mb-1">
+                        Freight (₹) <span className="text-amber-700 font-normal lowercase">(optional transport)</span>
                       </label>
                       <input
                         type="number"
@@ -1798,7 +1806,7 @@ export default function NewBill() {
                         value={line.freight !== undefined ? line.freight : ''}
                         onChange={(e) => handleUpdateLine(idx, 'freight', e.target.value)}
                         placeholder="0.00"
-                        className="w-full min-h-[48px] px-3 py-2 rounded-xl border-2 border-slate-300 text-slate-900 text-base font-bold"
+                        className="w-full min-h-[44px] px-3 py-1.5 rounded-lg border-2 border-amber-300 bg-white text-slate-900 text-base font-bold focus:border-amber-500 focus:outline-none"
                       />
                     </div>
 
@@ -1872,36 +1880,6 @@ export default function NewBill() {
         </datalist>
       </div>
 
-      {/* SECTION 2.5: FREIGHT CHARGES (OPTIONAL) */}
-      <div className="bg-white rounded-3xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-2">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <label className="block text-base font-black text-slate-900">
-              Freight Charges (Optional)
-            </label>
-            <p className="text-xs font-semibold text-slate-500">
-              Separate transport amount added below items table (no HSN, no GST).
-            </p>
-          </div>
-          <div className="w-full sm:w-56">
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center font-bold text-slate-400">
-                ₹
-              </span>
-              <input
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                value={freightAmount}
-                onChange={(e) => setFreightAmount(e.target.value)}
-                placeholder="0.00"
-                className="w-full min-h-[48px] pl-8 pr-3 py-2 rounded-2xl border-2 border-slate-300 text-slate-900 text-base font-bold text-right font-mono"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* SECTION 3: LIVE TOTALS (RATE-GROUP BREAKDOWN & GRAND TOTAL) */}
       <div className="bg-white rounded-3xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-4">
