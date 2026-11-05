@@ -75,3 +75,4 @@ console.log('12-item bill pages:', doc3.getNumberOfPages());
 if (doc3.getNumberOfPages() !== 2) throw new Error('12-item bill should be 2 pages');
 
 console.log('ALL 3 SCENARIOS PASSED WITH PERFECT PAGE COUNTS!');
+
