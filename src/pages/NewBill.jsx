@@ -723,6 +723,7 @@ export default function NewBill() {
   // Live Totals Calculation via tax.js
   // ===========================================================================
   const calculatedInvoice = useMemo(() => {
+    const rawOverallFreight = parseRupeesToPaise(freightAmount);
     const parsedLines = lines.map((l) => ({
       description: l.description,
       hsn: l.hsn,
@@ -733,8 +734,15 @@ export default function NewBill() {
       freightPaise: l.freight_paise !== undefined ? l.freight_paise : parseRupeesToPaise(l.freight || 0),
       freight_paise: l.freight_paise !== undefined ? l.freight_paise : parseRupeesToPaise(l.freight || 0),
     }));
-    const freightPaise = parseRupeesToPaise(freightAmount);
-    return calcInvoice(parsedLines, { roundToRupee: true, freightPaise });
+
+    // If overall freight is provided and individual lines don't specify freight, attach it to line 1
+    const hasPerItem = parsedLines.some((l) => l.freightPaise > 0);
+    if (!hasPerItem && rawOverallFreight > 0 && parsedLines.length > 0) {
+      parsedLines[0].freightPaise = rawOverallFreight;
+      parsedLines[0].freight_paise = rawOverallFreight;
+    }
+
+    return calcInvoice(parsedLines, { roundToRupee: true, freightPaise: 0 });
   }, [lines, freightAmount]);
 
   // Selected buyer object
@@ -1039,6 +1047,30 @@ export default function NewBill() {
 
       let createdInvoice = null;
       const { data, error } = await supabase.rpc('create_invoice', { payload });
+
+      if (!error && data?.id) {
+        // Guarantee line items freight_paise and totals are strictly persisted
+        const extraUpdate = {
+          taxable_paise: payload.taxable_paise,
+          cgst_paise: payload.cgst_paise,
+          sgst_paise: payload.sgst_paise,
+          payable_paise: payload.payable_paise,
+          freight_paise: payload.freight_paise || 0,
+          round_off_paise: payload.round_off_paise || 0,
+        };
+        await supabase.from('invoices').update(extraUpdate).eq('id', data.id);
+
+        for (let idx = 0; idx < payload.lines.length; idx++) {
+          const line = payload.lines[idx];
+          if (line.freight_paise > 0) {
+            await supabase
+              .from('invoice_lines')
+              .update({ freight_paise: line.freight_paise })
+              .eq('invoice_id', data.id)
+              .eq('line_no', idx + 1);
+          }
+        }
+      }
 
       if (error) {
         console.warn('RPC create_invoice error, using resilient direct table fallback:', error);
@@ -1888,6 +1920,40 @@ export default function NewBill() {
             </option>
           ))}
         </datalist>
+
+        {/* Overall Bill Freight (Optional) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-amber-50/80 rounded-2xl border-2 border-amber-300">
+          <div>
+            <label className="text-sm font-black text-amber-950 block">
+              Overall Bill Freight (₹)
+            </label>
+            <p className="text-xs font-semibold text-amber-800">
+              Enter overall transport for the bill. It is automatically added as a Freight row with GST.
+            </p>
+          </div>
+          <div className="w-full sm:w-56">
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center font-bold text-amber-600">
+                ₹
+              </span>
+              <input
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+                value={freightAmount}
+                onChange={(e) => {
+                  setFreightAmount(e.target.value);
+                  if (e.target.value) {
+                    setLines((prev) => prev.map((l) => ({ ...l, freight: '', freight_paise: 0 })));
+                  }
+                }}
+                placeholder="0.00"
+                className="w-full min-h-[46px] pl-8 pr-3 py-2 rounded-xl border-2 border-amber-300 bg-white text-slate-900 text-base font-bold text-right font-mono focus:border-amber-500 focus:outline-none"
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
 
