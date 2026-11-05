@@ -51,8 +51,11 @@ export function getRateGroupSummary(lines = []) {
         ? line.amount_paise
         : Math.round(((line.qty_milli || 0) * (line.rate_paise || 0)) / 1000)
     );
+    const freightPaise = Number(line.freight_paise ?? line.freightPaise ?? 0);
+    const lineTaxablePaise = amountPaise + freightPaise;
+
     const currentTaxable = groupMap.get(gstPercent) || 0;
-    groupMap.set(gstPercent, currentTaxable + amountPaise);
+    groupMap.set(gstPercent, currentTaxable + lineTaxablePaise);
   }
 
   const sortedPercents = Array.from(groupMap.keys()).sort((a, b) => a - b);
@@ -81,6 +84,7 @@ export function getRateGroupSummary(lines = []) {
  * 4. HSN-wise tax summary table rows.
  * Groups line items by (hsn, gst_percent).
  * Returns rows plus totals and tax in words.
+ * Includes per-item freight in the item's HSN taxable value.
  */
 export function getHsnSummaryRows(lines = []) {
   if (!Array.isArray(lines) || lines.length === 0) {
@@ -104,10 +108,12 @@ export function getHsnSummaryRows(lines = []) {
         ? line.amount_paise
         : Math.round(((line.qty_milli || 0) * (line.rate_paise || 0)) / 1000)
     );
+    const freightPaise = Number(line.freight_paise ?? line.freightPaise ?? 0);
+    const lineTaxablePaise = amountPaise + freightPaise;
 
     const key = `${hsn}__${gstPercent}`;
     const existing = hsnMap.get(key) || { hsn, gstPercent, taxablePaise: 0 };
-    existing.taxablePaise += amountPaise;
+    existing.taxablePaise += lineTaxablePaise;
     hsnMap.set(key, existing);
   }
 

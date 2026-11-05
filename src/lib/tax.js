@@ -36,26 +36,36 @@ export function paiseToRupees(paise) {
 export function calcInvoice(lines = [], { interState = false, roundToRupee = false, freightPaise = 0 } = {}) {
   // Calculate per-line taxable amount in paise:
   // qtyMilli is integer thousandths (1 unit = 1000, 2.5 kg = 2500)
+  // Per-item freight: If freight > 0, taxable value = (qty × rate) + freight
   const calculatedLines = lines.map((line) => {
-    const qtyMilli = Number(line.qtyMilli || 0);
-    const ratePaise = Number(line.ratePaise || 0);
-    const gstPercent = Number(line.gstPercent || 0);
-    const amountPaise = Math.round((qtyMilli * ratePaise) / 1000);
+    const qtyMilli = Number(line.qtyMilli ?? line.qty_milli ?? 0);
+    const ratePaise = Number(line.ratePaise ?? line.rate_paise ?? 0);
+    const gstPercent = Number(line.gstPercent ?? line.gst_percent ?? 0);
+    const lineFreightPaise = Number(line.freightPaise ?? line.freight_paise ?? 0);
+    const baseAmountPaise = Math.round((qtyMilli * ratePaise) / 1000);
+    const taxableAmountPaise = baseAmountPaise + lineFreightPaise;
 
     return {
       ...line,
       qtyMilli,
       ratePaise,
       gstPercent,
-      amountPaise,
+      freightPaise: lineFreightPaise,
+      freight_paise: lineFreightPaise,
+      baseAmountPaise,
+      amountPaise: baseAmountPaise,
+      amount_paise: baseAmountPaise,
+      taxableAmountPaise,
+      taxable_amount_paise: taxableAmountPaise,
     };
   });
 
-  // Group by GST percent to calculate group tax
+  // Group by GST percent to calculate group tax on consolidated taxable value
+  // Taxable value for each line includes (qty × rate) + per-item freight
   const groupMap = new Map();
   for (const line of calculatedLines) {
     const currentTaxable = groupMap.get(line.gstPercent) || 0;
-    groupMap.set(line.gstPercent, currentTaxable + line.amountPaise);
+    groupMap.set(line.gstPercent, currentTaxable + line.taxableAmountPaise);
   }
 
   const rateGroups = [];
@@ -100,9 +110,12 @@ export function calcInvoice(lines = [], { interState = false, roundToRupee = fal
     });
   }
 
-  const subtotalPaise = totalTaxablePaise + totalTaxPaise;
-  const freightAmtPaise = Number(freightPaise) || 0;
-  const totalBeforeRoundOffPaise = subtotalPaise + freightAmtPaise;
+  const totalItemFreightPaise = calculatedLines.reduce((acc, l) => acc + (l.freightPaise || 0), 0);
+  const extraFreightPaise = Number(freightPaise) || 0;
+  const combinedFreightPaise = totalItemFreightPaise + extraFreightPaise;
+
+  const subtotalPaise = totalTaxablePaise + totalTaxPaise + extraFreightPaise;
+  const totalBeforeRoundOffPaise = subtotalPaise;
   let roundOffPaise = 0;
   let payablePaise = totalBeforeRoundOffPaise;
 
@@ -120,7 +133,7 @@ export function calcInvoice(lines = [], { interState = false, roundToRupee = fal
     totalSgstPaise,
     totalIgstPaise,
     totalTaxPaise,
-    freightPaise: freightAmtPaise,
+    freightPaise: combinedFreightPaise,
     subtotalPaise,
     grandTotalPaise: totalBeforeRoundOffPaise,
     roundOffPaise,

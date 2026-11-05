@@ -235,7 +235,7 @@ export function buildGstr1B2bRows(invoices = []) {
     const totalInvoiceVal = paiseToNumber(inv.payable_paise);
     const pos = inv.buyer_state_code ? `${inv.buyer_state_code}-Tamil Nadu` : '33-Tamil Nadu';
 
-    // Group lines by gst_percent
+    // Group lines by gst_percent (including per-item freight in taxable value)
     const rateMap = new Map();
     for (const line of lines) {
       const rate = Number(line.gst_percent ?? 5);
@@ -244,7 +244,9 @@ export function buildGstr1B2bRows(invoices = []) {
           ? line.amount_paise
           : Math.round(((line.qty_milli || 0) * (line.rate_paise || 0)) / 1000)
       );
-      rateMap.set(rate, (rateMap.get(rate) || 0) + amountPaise);
+      const freightPaise = Number(line.freight_paise ?? line.freightPaise ?? 0);
+      const lineTaxablePaise = amountPaise + freightPaise;
+      rateMap.set(rate, (rateMap.get(rate) || 0) + lineTaxablePaise);
     }
 
     if (rateMap.size === 0) {
@@ -296,6 +298,8 @@ export function buildGstr1HsnRows(invoices = []) {
           ? line.amount_paise
           : Math.round(((line.qty_milli || 0) * (line.rate_paise || 0)) / 1000)
       );
+      const freightPaise = Number(line.freight_paise ?? line.freightPaise ?? 0);
+      const lineTaxablePaise = amountPaise + freightPaise;
       const qtyMilli = Number(line.qty_milli || 0);
 
       const existing = hsnMap.get(key) || {
@@ -309,7 +313,7 @@ export function buildGstr1HsnRows(invoices = []) {
       };
 
       existing.totalQtyMilli += qtyMilli;
-      existing.taxablePaise += amountPaise;
+      existing.taxablePaise += lineTaxablePaise;
       hsnMap.set(key, existing);
     }
   }

@@ -433,18 +433,29 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
     // -------------------------------------------------------------
     // ITEMS ROWS: 12pt regular (min row 8mm, grows if text wraps).
     // EVERY cell boxed on all 4 sides. Always show at least 5 item rows.
+    // If an item has per-item freight > 0, an extra row is shown directly below it
+    // with the same HSN and GST rate.
     // -------------------------------------------------------------
-    const minRowCount = isLast ? Math.max(5, currentLines.length) : currentLines.length;
+    const renderedItemRows = [];
+    currentLines.forEach((line, idx) => {
+      renderedItemRows.push({ type: 'item', line, index: idx });
+      const freightPaise = Number(line.freight_paise || line.freightPaise || 0);
+      if (freightPaise > 0) {
+        renderedItemRows.push({ type: 'freight', line, freightPaise });
+      }
+    });
+
+    const minRowCount = isLast ? Math.max(5, renderedItemRows.length) : renderedItemRows.length;
 
     for (let r = 0; r < minRowCount; r++) {
-      const line = currentLines[r];
+      const rowItem = renderedItemRows[r];
       let rHeight = 8.0;
 
       let descLines = [];
-      if (line) {
+      if (rowItem && rowItem.type === 'item') {
         doc.setFont(fontName, 'normal');
         doc.setFontSize(12);
-        descLines = getWrappedLines(doc, line.description || '', COL_WIDTHS[1] - 2.4, COL_WIDTHS[1]);
+        descLines = getWrappedLines(doc, rowItem.line.description || '', COL_WIDTHS[1] - 2.4, COL_WIDTHS[1]);
         if (descLines.length > 1) {
           rHeight = Math.max(8.0, descLines.length * 4.2 + 2.0);
         }
@@ -455,94 +466,139 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
         drawBox(doc, COL_X[c], y, COL_WIDTHS[c], rHeight);
       }
 
-      if (line) {
-        const lineNo = line.line_no !== undefined ? line.line_no : r + 1;
-        const amountPaise = Number(
-          line.amount_paise !== undefined && line.amount_paise !== null
-            ? line.amount_paise
-            : Math.round(((line.qty_milli || 0) * (line.rate_paise || 0)) / 1000)
-        );
+      if (rowItem) {
+        if (rowItem.type === 'item') {
+          const line = rowItem.line;
+          const lineNo = line.line_no !== undefined ? line.line_no : rowItem.index + 1;
+          const amountPaise = Number(
+            line.amount_paise !== undefined && line.amount_paise !== null
+              ? line.amount_paise
+              : Math.round(((line.qty_milli || 0) * (line.rate_paise || 0)) / 1000)
+          );
 
-        // Col A: SI. No (Centered)
-        drawCell(doc, String(lineNo), COL_X[0], y, COL_WIDTHS[0], rHeight, {
-          fontSize: 12,
-          fontStyle: 'normal',
-          align: 'center',
-          valign: 'middle',
-          fontName,
-          padding: 0.8,
-        });
+          // Col A: SI. No (Centered)
+          drawCell(doc, String(lineNo), COL_X[0], y, COL_WIDTHS[0], rHeight, {
+            fontSize: 12,
+            fontStyle: 'normal',
+            align: 'center',
+            valign: 'middle',
+            fontName,
+            padding: 0.8,
+          });
 
-        // Col B: Description (Left)
-        drawCell(doc, descLines, COL_X[1], y, COL_WIDTHS[1], rHeight, {
-          fontSize: 12,
-          fontStyle: 'normal',
-          align: 'left',
-          valign: descLines.length > 1 ? 'top' : 'middle',
-          fontName,
-          padding: 1.2,
-        });
+          // Col B: Description (Left)
+          drawCell(doc, descLines, COL_X[1], y, COL_WIDTHS[1], rHeight, {
+            fontSize: 12,
+            fontStyle: 'normal',
+            align: 'left',
+            valign: descLines.length > 1 ? 'top' : 'middle',
+            fontName,
+            padding: 1.2,
+          });
 
-        // Col C: HSN/SAC (Centered)
-        drawCell(doc, String(line.hsn || '-'), COL_X[2], y, COL_WIDTHS[2], rHeight, {
-          fontSize: 12,
-          fontStyle: 'normal',
-          align: 'center',
-          valign: 'middle',
-          fontName,
-          padding: 0.8,
-        });
+          // Col C: HSN/SAC (Centered)
+          drawCell(doc, String(line.hsn || '-'), COL_X[2], y, COL_WIDTHS[2], rHeight, {
+            fontSize: 12,
+            fontStyle: 'normal',
+            align: 'center',
+            valign: 'middle',
+            fontName,
+            padding: 0.8,
+          });
 
-        // Col D: TAX% (Right)
-        const taxStr = line.gst_percent !== undefined ? `${line.gst_percent}%` : '-';
-        drawCell(doc, taxStr, COL_X[3], y, COL_WIDTHS[3], rHeight, {
-          fontSize: 12,
-          fontStyle: 'normal',
-          align: 'right',
-          valign: 'middle',
-          fontName,
-          padding: 1.0,
-        });
+          // Col D: TAX% (Right)
+          const taxStr = line.gst_percent !== undefined ? `${line.gst_percent}%` : '-';
+          drawCell(doc, taxStr, COL_X[3], y, COL_WIDTHS[3], rHeight, {
+            fontSize: 12,
+            fontStyle: 'normal',
+            align: 'right',
+            valign: 'middle',
+            fontName,
+            padding: 1.0,
+          });
 
-        // Col E: Quantity (Right)
-        drawCell(doc, formatMilliToQuantity(line.qty_milli) || '0', COL_X[4], y, COL_WIDTHS[4], rHeight, {
-          fontSize: 12,
-          fontStyle: 'normal',
-          align: 'right',
-          valign: 'middle',
-          fontName,
-          padding: 1.2,
-        });
+          // Col E: Quantity (Right)
+          drawCell(doc, formatMilliToQuantity(line.qty_milli) || '0', COL_X[4], y, COL_WIDTHS[4], rHeight, {
+            fontSize: 12,
+            fontStyle: 'normal',
+            align: 'right',
+            valign: 'middle',
+            fontName,
+            padding: 1.2,
+          });
 
-        // Col F: Rate (Right, 2 decimals)
-        drawCell(doc, formatPlainAmount(line.rate_paise), COL_X[5], y, COL_WIDTHS[5], rHeight, {
-          fontSize: 12,
-          fontStyle: 'normal',
-          align: 'right',
-          valign: 'middle',
-          fontName,
-          padding: 1.2,
-        });
+          // Col F: Rate (Right, 2 decimals)
+          drawCell(doc, formatPlainAmount(line.rate_paise), COL_X[5], y, COL_WIDTHS[5], rHeight, {
+            fontSize: 12,
+            fontStyle: 'normal',
+            align: 'right',
+            valign: 'middle',
+            fontName,
+            padding: 1.2,
+          });
 
-        // Col G: Per (Left, lowercase)
-        drawCell(doc, String(line.unit || 'nos').toLowerCase(), COL_X[6], y, COL_WIDTHS[6], rHeight, {
-          fontSize: 12,
-          fontStyle: 'normal',
-          align: 'left',
-          valign: 'middle',
-          fontName,
-          padding: 1.2,
-        });
+          // Col G: Per (Left, lowercase)
+          drawCell(doc, String(line.unit || 'nos').toLowerCase(), COL_X[6], y, COL_WIDTHS[6], rHeight, {
+            fontSize: 12,
+            fontStyle: 'normal',
+            align: 'left',
+            valign: 'middle',
+            fontName,
+            padding: 1.2,
+          });
 
-        // Col H: Amount (Right, 2 decimals)
-        drawCell(doc, formatPlainAmount(amountPaise), COL_X[7], y, COL_WIDTHS[7], rHeight, {
-          fontSize: 12,
-          fontStyle: 'normal',
-          align: 'right',
-          valign: 'middle',
-          fontName,
-          padding: 1.2,
-        });
+          // Col H: Amount (Right, 2 decimals)
+          drawCell(doc, formatPlainAmount(amountPaise), COL_X[7], y, COL_WIDTHS[7], rHeight, {
+            fontSize: 12,
+            fontStyle: 'normal',
+            align: 'right',
+            valign: 'middle',
+            fontName,
+            padding: 1.2,
+          });
+        } else if (rowItem.type === 'freight') {
+          const line = rowItem.line;
+          // Col B: Description = Freight
+          drawCell(doc, 'Freight', COL_X[1], y, COL_WIDTHS[1], rHeight, {
+            fontSize: 12,
+            fontStyle: 'normal',
+            align: 'left',
+            valign: 'middle',
+            fontName,
+            padding: 1.2,
+          });
+
+          // Col C: HSN/SAC (same HSN)
+          drawCell(doc, String(line.hsn || '-'), COL_X[2], y, COL_WIDTHS[2], rHeight, {
+            fontSize: 12,
+            fontStyle: 'normal',
+            align: 'center',
+            valign: 'middle',
+            fontName,
+            padding: 0.8,
+          });
+
+          // Col D: TAX% (same TAX%)
+          const taxStr = line.gst_percent !== undefined ? `${line.gst_percent}%` : '-';
+          drawCell(doc, taxStr, COL_X[3], y, COL_WIDTHS[3], rHeight, {
+            fontSize: 12,
+            fontStyle: 'normal',
+            align: 'right',
+            valign: 'middle',
+            fontName,
+            padding: 1.0,
+          });
+
+          // Col H: Amount = freight amount
+          drawCell(doc, formatPlainAmount(rowItem.freightPaise), COL_X[7], y, COL_WIDTHS[7], rHeight, {
+            fontSize: 12,
+            fontStyle: 'normal',
+            align: 'right',
+            valign: 'middle',
+            fontName,
+            padding: 1.2,
+          });
+        }
       }
 
       y += rHeight;
@@ -578,12 +634,13 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
       y += taxRowH;
     });
 
-    // Freight row (if freight_paise > 0)
-    const freightPaise = Number(invoice.freight_paise) || 0;
-    if (freightPaise > 0) {
+    // Freight row (only for legacy bill-level freight when no item has per-item freight)
+    const hasPerItemFreight = (invoice.lines || []).some((l) => Number(l.freight_paise || l.freightPaise || 0) > 0);
+    const billFreightPaise = !hasPerItemFreight ? (Number(invoice.freight_paise) || 0) : 0;
+    if (billFreightPaise > 0) {
       for (let c = 0; c < 8; c++) drawBox(doc, COL_X[c], y, COL_WIDTHS[c], taxRowH);
       drawCell(doc, 'Freight Charges', COL_X[1], y, COL_WIDTHS[1], taxRowH, { fontSize: 12, fontStyle: 'normal', align: 'left', valign: 'middle', fontName, padding: 1.2 });
-      drawCell(doc, formatPlainAmount(freightPaise), COL_X[7], y, COL_WIDTHS[7], taxRowH, { fontSize: 12, fontStyle: 'normal', align: 'right', valign: 'middle', fontName, padding: 1.2 });
+      drawCell(doc, formatPlainAmount(billFreightPaise), COL_X[7], y, COL_WIDTHS[7], taxRowH, { fontSize: 12, fontStyle: 'normal', align: 'right', valign: 'middle', fontName, padding: 1.2 });
       y += taxRowH;
     }
 
@@ -592,9 +649,11 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
     const lineTaxableSum = (invoice.lines || []).reduce((acc, l) => {
       const q = l.qty_milli || 0;
       const r = l.rate_paise || 0;
-      return acc + (l.amount_paise != null ? Number(l.amount_paise) : Math.round((q * r) / 1000));
+      const base = l.amount_paise != null ? Number(l.amount_paise) : Math.round((q * r) / 1000);
+      const fr = Number(l.freight_paise || l.freightPaise || 0);
+      return acc + base + fr;
     }, 0);
-    const subtotalBeforeRound = lineTaxableSum + totalTaxPaise + freightPaise;
+    const subtotalBeforeRound = lineTaxableSum + totalTaxPaise + billFreightPaise;
     const roundOffPaise = invoice.round_off_paise != null
       ? Number(invoice.round_off_paise)
       : (invoice.payable_paise != null ? (Number(invoice.payable_paise) - subtotalBeforeRound) : 0);

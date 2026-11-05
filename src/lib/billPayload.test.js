@@ -152,6 +152,8 @@ describe('billPayload helpers', () => {
         qty_milli: 1000,
         rate_paise: 62500,
         gst_percent: 5,
+        amount_paise: 62500,
+        freight_paise: 0,
       });
       expect(payload.lines[1]).toEqual({
         line_no: 2,
@@ -161,6 +163,8 @@ describe('billPayload helpers', () => {
         qty_milli: 1000,
         rate_paise: 50000,
         gst_percent: 18,
+        amount_paise: 50000,
+        freight_paise: 0,
       });
 
       // Words test
@@ -226,6 +230,58 @@ describe('billPayload helpers', () => {
       expect(paiseToRupees(payload.payable_paise)).toBe('3392.50');
 
       expect(payload.lines).toHaveLength(3);
+    });
+
+    it('builds payload correctly with per-item freight and nearest rupee round-off', () => {
+      const header = {
+        invoice_date: '2026-10-15',
+        buyer_id: '11111111-1111-1111-1111-111111111111',
+        buyer_name: 'KH EXPORT INDIA PRIVATE LTD',
+      };
+
+      const lines = [
+        // 120 @ 8.00 = 960.00 + freight 40.00 = taxable 1000.00 @ 18% -> CGST 90, SGST 90
+        {
+          description: 'Oil Cane Pasting',
+          hsn: '3926',
+          unit: 'PCS',
+          quantity: '120',
+          rate: '8.00',
+          freight: '40.00',
+          gst_percent: 18,
+        },
+        // 24 @ 25.00 = 600.00 (no freight) @ 18% -> CGST 54, SGST 54
+        {
+          description: 'Duracell Battery',
+          hsn: '85068090',
+          unit: 'PCS',
+          quantity: '24',
+          rate: '25.00',
+          freight: '',
+          gst_percent: 18,
+        },
+      ];
+
+      const payload = buildInvoicePayload({ header, lines, roundToRupee: true });
+
+      // Total Taxable = 1000.00 + 600.00 = 1600.00 (160000 paise)
+      expect(payload.taxable_paise).toBe(160000);
+      expect(paiseToRupees(payload.taxable_paise)).toBe('1600.00');
+
+      // Total Tax = 18% of 1600.00 = 288.00 (28800 paise) -> CGST 144.00, SGST 144.00
+      expect(payload.cgst_paise).toBe(14400);
+      expect(payload.sgst_paise).toBe(14400);
+
+      // Payable = 1600.00 + 288.00 = 1888.00
+      expect(payload.payable_paise).toBe(188800);
+      expect(payload.freight_paise).toBe(4000); // 40.00
+      expect(payload.round_off_paise).toBe(0);
+
+      // Lines must include freight_paise
+      expect(payload.lines[0].freight_paise).toBe(4000);
+      expect(payload.lines[0].amount_paise).toBe(96000); // base item amount
+      expect(payload.lines[1].freight_paise).toBe(0);
+      expect(payload.lines[1].amount_paise).toBe(60000);
     });
   });
 });

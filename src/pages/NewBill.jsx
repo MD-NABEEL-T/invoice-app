@@ -308,6 +308,8 @@ export default function NewBill() {
             rate: paiseToRupees(l.rate_paise),
             rate_paise: Number(l.rate_paise || 0),
             qty_milli: Number(l.qty_milli || 0),
+            freight: l.freight_paise ? paiseToRupees(l.freight_paise) : '',
+            freight_paise: Number(l.freight_paise || 0),
           }));
           setLines(mapped);
         }
@@ -377,6 +379,8 @@ export default function NewBill() {
             rate: paiseToRupees(l.rate_paise),
             rate_paise: Number(l.rate_paise || 0),
             qty_milli: Number(l.qty_milli || 0),
+            freight: l.freight_paise ? paiseToRupees(l.freight_paise) : '',
+            freight_paise: Number(l.freight_paise || 0),
           }));
           setLines(mapped);
         }
@@ -562,6 +566,8 @@ export default function NewBill() {
       unit: item.unit || 'PCS',
       quantity: '1',
       rate: initialRateStr,
+      freight: '',
+      freight_paise: 0,
       gst_percent:
         item.gst_percent !== null && item.gst_percent !== undefined
           ? String(item.gst_percent)
@@ -615,6 +621,8 @@ export default function NewBill() {
         cur.qty_milli = parseQuantityToMilli(value);
       } else if (field === 'rate') {
         cur.rate_paise = parseRupeesToPaise(value);
+      } else if (field === 'freight') {
+        cur.freight_paise = parseRupeesToPaise(value);
       }
       updated[index] = cur;
       return updated;
@@ -677,6 +685,8 @@ export default function NewBill() {
         unit: created.unit || 'PCS',
         quantity: '1',
         rate: newItemForm.usual_rate || '',
+        freight: '',
+        freight_paise: 0,
         gst_percent:
           created.gst_percent !== null && created.gst_percent !== undefined
             ? String(created.gst_percent)
@@ -709,9 +719,11 @@ export default function NewBill() {
       description: l.description,
       hsn: l.hsn,
       unit: l.unit,
-      qtyMilli: parseQuantityToMilli(l.quantity),
-      ratePaise: parseRupeesToPaise(l.rate),
+      qtyMilli: l.qty_milli !== undefined ? l.qty_milli : parseQuantityToMilli(l.quantity),
+      ratePaise: l.rate_paise !== undefined ? l.rate_paise : parseRupeesToPaise(l.rate),
       gstPercent: Number(l.gst_percent || 0),
+      freightPaise: l.freight_paise !== undefined ? l.freight_paise : parseRupeesToPaise(l.freight || 0),
+      freight_paise: l.freight_paise !== undefined ? l.freight_paise : parseRupeesToPaise(l.freight || 0),
     }));
     const freightPaise = parseRupeesToPaise(freightAmount);
     return calcInvoice(parsedLines, { roundToRupee: true, freightPaise });
@@ -972,9 +984,14 @@ export default function NewBill() {
             rate_paise: l.rate_paise,
             gst_percent: Number(l.gst_percent),
             amount_paise: l.amount_paise,
+            freight_paise: l.freight_paise || 0,
           }));
-          const { error: linesErr } = await supabase.from('invoice_lines').insert(lineInserts);
-          if (linesErr) throw linesErr;
+          let { error: linesErr } = await supabase.from('invoice_lines').insert(lineInserts);
+          if (linesErr) {
+            const fallbackLines = lineInserts.map(({ freight_paise, ...rest }) => rest);
+            const { error: retryErr } = await supabase.from('invoice_lines').insert(fallbackLines);
+            if (retryErr) throw retryErr;
+          }
         } else {
           // Ensure freight, round off, and exact payable_paise are persisted even if DB RPC was an older version
           const extraUpdate = {
@@ -1068,28 +1085,28 @@ export default function NewBill() {
 
         if (directInvErr) throw directInvErr;
 
-        const lineInserts = lines.map((l, idx) => {
-          const qtyMilli = l.qty_milli || parseQuantityToMilli(l.quantity);
-          const ratePaise = l.rate_paise !== undefined ? l.rate_paise : parseRupeesToPaise(l.rate);
-          const lineTotal = Math.round((qtyMilli * ratePaise) / 1000);
-          return {
-            invoice_id: directInv.id,
-            line_no: idx + 1,
-            description: l.description,
-            hsn: l.hsn,
-            unit: l.unit || 'PCS',
-            qty_milli: qtyMilli,
-            rate_paise: ratePaise,
-            gst_percent: Number(l.gst_percent),
-            amount_paise: lineTotal,
-          };
-        });
+        const lineInserts = payload.lines.map((l, idx) => ({
+          invoice_id: directInv.id,
+          line_no: idx + 1,
+          description: l.description,
+          hsn: l.hsn,
+          unit: l.unit || 'PCS',
+          qty_milli: l.qty_milli,
+          rate_paise: l.rate_paise,
+          gst_percent: Number(l.gst_percent),
+          amount_paise: l.amount_paise,
+          freight_paise: l.freight_paise || 0,
+        }));
 
-        const { error: directLinesErr } = await supabase
+        let { error: directLinesErr } = await supabase
           .from('invoice_lines')
           .insert(lineInserts);
 
-        if (directLinesErr) throw directLinesErr;
+        if (directLinesErr) {
+          const fallbackLines = lineInserts.map(({ freight_paise, ...rest }) => rest);
+          const { error: retryLinesErr } = await supabase.from('invoice_lines').insert(fallbackLines);
+          if (retryLinesErr) throw retryLinesErr;
+        }
 
         // Increment counter
         await supabase
@@ -1613,6 +1630,8 @@ export default function NewBill() {
               const qtyMilli = parseQuantityToMilli(line.quantity);
               const ratePaise = parseRupeesToPaise(line.rate);
               const lineAmountPaise = Math.round((qtyMilli * ratePaise) / 1000);
+              const lineFreightPaise = line.freight_paise !== undefined ? line.freight_paise : parseRupeesToPaise(line.freight || 0);
+              const lineTaxablePaise = lineAmountPaise + lineFreightPaise;
 
               const needsChecking = !line.hsn || line.gst_percent === '' || line.gst_percent === null;
               const hsnCheck = line.hsn ? validateHSN(line.hsn) : { warning: null };
@@ -1749,8 +1768,8 @@ export default function NewBill() {
                     </div>
                   </div>
 
-                  {/* HSN (editable free text) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 items-center">
+                  {/* HSN, Per-Item Freight, & Taxable Amount */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 items-center">
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
                         HSN Code
@@ -1764,14 +1783,35 @@ export default function NewBill() {
                       />
                     </div>
 
-                    {/* Calculated Line Amount */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                        Freight (₹) <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                      </label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        value={line.freight !== undefined ? line.freight : ''}
+                        onChange={(e) => handleUpdateLine(idx, 'freight', e.target.value)}
+                        placeholder="0.00"
+                        className="w-full min-h-[48px] px-3 py-2 rounded-xl border-2 border-slate-300 text-slate-900 text-base font-bold"
+                      />
+                    </div>
+
+                    {/* Calculated Line Taxable Amount */}
                     <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-right">
                       <span className="text-xs uppercase font-bold text-slate-400 block">
                         Line Taxable Amount
                       </span>
                       <span className="text-lg font-black text-slate-900 font-mono">
-                        {formatRupees(lineAmountPaise)}
+                        {formatRupees(lineTaxablePaise)}
                       </span>
+                      {lineFreightPaise > 0 && (
+                        <span className="text-[11px] text-blue-600 block font-semibold">
+                          (incl. {formatRupees(lineFreightPaise)} freight)
+                        </span>
+                      )}
                     </div>
                   </div>
 

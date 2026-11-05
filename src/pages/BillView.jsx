@@ -129,6 +129,7 @@ export default function BillView() {
       qtyMilli: Number(l.qty_milli || 0),
       ratePaise: Number(l.rate_paise || 0),
       gstPercent: Number(l.gst_percent || 0),
+      freightPaise: Number(l.freight_paise || 0),
     }));
     const calc = calcInvoice(formatted);
     return calc.rateGroups;
@@ -544,9 +545,16 @@ export default function BillView() {
                         {line.description}
                       </h4>
                     </div>
-                    <span className="text-base font-black font-mono text-slate-900">
-                      {formatRupees(line.amount_paise)}
-                    </span>
+                    <div className="text-right">
+                      <span className="text-base font-black font-mono text-slate-900 block">
+                        {formatRupees(Number(line.amount_paise || 0) + Number(line.freight_paise || 0))}
+                      </span>
+                      {Number(line.freight_paise) > 0 && (
+                        <span className="text-[11px] font-bold text-blue-600 block">
+                          (Item {formatRupees(line.amount_paise)} + Freight {formatRupees(line.freight_paise)})
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-semibold text-slate-600 bg-white p-2.5 rounded-xl border border-slate-200">

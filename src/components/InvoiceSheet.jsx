@@ -129,9 +129,19 @@ export function InvoicePage({
   const hsnSummary = isLast ? getHsnSummaryRows(invoice?.lines || []) : null;
   const isCancelled = invoice?.status === 'cancelled';
 
+  // Expand rows to include extra per-item freight rows if freight > 0
+  const renderedItemRows = [];
+  (lines || []).forEach((line, idx) => {
+    renderedItemRows.push({ type: 'item', line, index: idx });
+    const freightPaise = Number(line.freight_paise || line.freightPaise || 0);
+    if (freightPaise > 0) {
+      renderedItemRows.push({ type: 'freight', line, freightPaise });
+    }
+  });
+
   // Minimum 5 item rows padded with empty boxed cells matching Excel Book1.xlsx
-  const minRows = isLast ? Math.max(5, lines.length) : lines.length;
-  const emptyRowCount = minRows - lines.length;
+  const minRows = isLast ? Math.max(5, renderedItemRows.length) : renderedItemRows.length;
+  const emptyRowCount = minRows - renderedItemRows.length;
 
   return (
     <div
@@ -395,49 +405,81 @@ export function InvoicePage({
             </tr>
           </thead>
           <tbody>
-            {lines.map((line, idx) => {
-              const lineNo = line.line_no !== undefined ? line.line_no : idx + 1;
-              const amountPaise = Number(
-                line.amount_paise !== undefined && line.amount_paise !== null
-                  ? line.amount_paise
-                  : Math.round(((line.qty_milli || 0) * (line.rate_paise || 0)) / 1000)
-              );
+            {renderedItemRows.map((rowItem, rIdx) => {
+              if (rowItem.type === 'item') {
+                const line = rowItem.line;
+                const lineNo = line.line_no !== undefined ? line.line_no : rowItem.index + 1;
+                const amountPaise = Number(
+                  line.amount_paise !== undefined && line.amount_paise !== null
+                    ? line.amount_paise
+                    : Math.round(((line.qty_milli || 0) * (line.rate_paise || 0)) / 1000)
+                );
 
-              return (
-                <tr
-                  key={line.id || idx}
-                  style={{
-                    color: '#000000',
-                    borderBottom: '1px solid #000000',
-                    minHeight: '32px',
-                  }}
-                >
-                  <td className="py-1 px-1 text-center font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
-                    {lineNo}
-                  </td>
-                  <td className="py-1 px-2 text-left font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
-                    {line.description}
-                  </td>
-                  <td className="py-1 px-1 text-center font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
-                    {line.hsn || '-'}
-                  </td>
-                  <td className="py-1 px-1 text-right font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
-                    {line.gst_percent !== undefined ? `${line.gst_percent}%` : '-'}
-                  </td>
-                  <td className="py-1 px-1 text-right font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
-                    {formatMilliToQuantity(line.qty_milli)}
-                  </td>
-                  <td className="py-1 px-1 text-right font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
-                    {formatPlainAmount(line.rate_paise)}
-                  </td>
-                  <td className="py-1 px-1 text-left lowercase font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
-                    {String(line.unit || 'nos').toLowerCase()}
-                  </td>
-                  <td className="py-1 px-2 text-right font-normal" style={{ borderBottom: '1px solid #000000' }}>
-                    {formatPlainAmount(amountPaise)}
-                  </td>
-                </tr>
-              );
+                return (
+                  <tr
+                    key={`item-${line.id || rIdx}`}
+                    style={{
+                      color: '#000000',
+                      borderBottom: '1px solid #000000',
+                      minHeight: '32px',
+                    }}
+                  >
+                    <td className="py-1 px-1 text-center font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
+                      {lineNo}
+                    </td>
+                    <td className="py-1 px-2 text-left font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
+                      {line.description}
+                    </td>
+                    <td className="py-1 px-1 text-center font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
+                      {line.hsn || '-'}
+                    </td>
+                    <td className="py-1 px-1 text-right font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
+                      {line.gst_percent !== undefined ? `${line.gst_percent}%` : '-'}
+                    </td>
+                    <td className="py-1 px-1 text-right font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
+                      {formatMilliToQuantity(line.qty_milli)}
+                    </td>
+                    <td className="py-1 px-1 text-right font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
+                      {formatPlainAmount(line.rate_paise)}
+                    </td>
+                    <td className="py-1 px-1 text-left lowercase font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
+                      {String(line.unit || 'nos').toLowerCase()}
+                    </td>
+                    <td className="py-1 px-2 text-right font-normal" style={{ borderBottom: '1px solid #000000' }}>
+                      {formatPlainAmount(amountPaise)}
+                    </td>
+                  </tr>
+                );
+              } else if (rowItem.type === 'freight') {
+                const line = rowItem.line;
+                return (
+                  <tr
+                    key={`freight-${line.id || rIdx}`}
+                    style={{
+                      color: '#000000',
+                      borderBottom: '1px solid #000000',
+                      height: '32px',
+                    }}
+                  >
+                    <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                    <td className="py-1 px-2 text-left font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
+                      Freight
+                    </td>
+                    <td className="py-1 px-1 text-center font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
+                      {line.hsn || '-'}
+                    </td>
+                    <td className="py-1 px-1 text-right font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
+                      {line.gst_percent !== undefined ? `${line.gst_percent}%` : '-'}
+                    </td>
+                    <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                    <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                    <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                    <td className="py-1 px-2 text-right font-normal" style={{ borderBottom: '1px solid #000000' }}>
+                      {formatPlainAmount(rowItem.freightPaise)}
+                    </td>
+                  </tr>
+                );
+              }
             })}
 
             {/* Spacer Rows: Pad so bill has at least 5 boxed rows matching Excel (min 8mm / 32px each) */}
@@ -509,34 +551,42 @@ export function InvoicePage({
               </React.Fragment>
             ))}
 
-            {/* Freight row (if freight_paise > 0) */}
-            {isLast && Number(invoice.freight_paise) > 0 && (
-              <tr style={{ borderBottom: '1px solid #000000', height: '32px' }}>
-                <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
-                <td className="py-1 px-2 text-left font-normal text-[12pt]" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
-                  Freight Charges
-                </td>
-                <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
-                <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
-                <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
-                <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
-                <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
-                <td className="py-1 px-2 text-right font-normal text-[12pt]" style={{ borderBottom: '1px solid #000000' }}>
-                  {formatPlainAmount(invoice.freight_paise)}
-                </td>
-              </tr>
-            )}
+            {/* Freight row (only for legacy bill-level freight when no item has per-item freight) */}
+            {isLast && (() => {
+              const hasPerItemFreight = (invoice.lines || []).some((l) => Number(l.freight_paise || l.freightPaise || 0) > 0);
+              const billFreight = !hasPerItemFreight ? (Number(invoice.freight_paise) || 0) : 0;
+              if (billFreight <= 0) return null;
+              return (
+                <tr style={{ borderBottom: '1px solid #000000', height: '32px' }}>
+                  <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                  <td className="py-1 px-2 text-left font-normal text-[12pt]" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
+                    Freight Charges
+                  </td>
+                  <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                  <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                  <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                  <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                  <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                  <td className="py-1 px-2 text-right font-normal text-[12pt]" style={{ borderBottom: '1px solid #000000' }}>
+                    {formatPlainAmount(billFreight)}
+                  </td>
+                </tr>
+              );
+            })()}
 
             {/* Round Off row (+/- paise) */}
             {isLast && (() => {
-              const freight = Number(invoice.freight_paise) || 0;
+              const hasPerItemFreight = (invoice.lines || []).some((l) => Number(l.freight_paise || l.freightPaise || 0) > 0);
+              const billFreight = !hasPerItemFreight ? (Number(invoice.freight_paise) || 0) : 0;
               const totalTax = rateGroups.reduce((acc, g) => acc + (g.cgstPaise || 0) + (g.sgstPaise || 0), 0);
               const lineTaxableSum = (invoice.lines || []).reduce((acc, l) => {
                 const q = l.qty_milli || 0;
                 const r = l.rate_paise || 0;
-                return acc + (l.amount_paise != null ? Number(l.amount_paise) : Math.round((q * r) / 1000));
+                const base = l.amount_paise != null ? Number(l.amount_paise) : Math.round((q * r) / 1000);
+                const fr = Number(l.freight_paise || l.freightPaise || 0);
+                return acc + base + fr;
               }, 0);
-              const subtotalBeforeRound = lineTaxableSum + totalTax + freight;
+              const subtotalBeforeRound = lineTaxableSum + totalTax + billFreight;
               const ro = invoice.round_off_paise != null
                 ? Number(invoice.round_off_paise)
                 : (invoice.payable_paise != null ? (Number(invoice.payable_paise) - subtotalBeforeRound) : 0);

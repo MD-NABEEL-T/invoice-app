@@ -128,6 +128,34 @@ describe('invoiceLayout pure helpers', () => {
       expect(res.totalTaxPaise).toBe(51750);
       expect(res.taxInWords).toBe('Rupees Five Hundred Seventeen and Fifty Paise Only');
     });
+
+    it('includes per-item freight in HSN summary taxable value and tax computation', () => {
+      const lines = [
+        // Item with freight: amount 960.00 + freight 40.00 = taxable 1000.00
+        { description: 'Oil Cane Pasting', hsn: '3926', gst_percent: 18, amount_paise: 96000, freight_paise: 4000 },
+        // Item without freight: amount 600.00
+        { description: 'Duracell Battery', hsn: '85068090', gst_percent: 18, amount_paise: 60000, freight_paise: 0 },
+      ];
+
+      const res = getHsnSummaryRows(lines);
+      expect(res.rows).toHaveLength(2);
+
+      const hsn3926 = res.rows.find((r) => r.hsn === '3926');
+      expect(hsn3926).toBeDefined();
+      expect(hsn3926.taxablePaise).toBe(100000); // 960 + 40
+      expect(hsn3926.centralTaxPaise).toBe(9000); // 9% on 1000.00
+      expect(hsn3926.stateTaxPaise).toBe(9000);
+      expect(hsn3926.totalTaxPaise).toBe(18000);
+
+      const hsn8506 = res.rows.find((r) => r.hsn === '85068090');
+      expect(hsn8506).toBeDefined();
+      expect(hsn8506.taxablePaise).toBe(60000); // 600 without freight
+      expect(hsn8506.centralTaxPaise).toBe(5400); // 9% on 600.00
+      expect(hsn8506.stateTaxPaise).toBe(5400);
+
+      expect(res.totalTaxablePaise).toBe(160000);
+      expect(res.totalTaxPaise).toBe(28800);
+    });
   });
 
   describe('getCopyLabel', () => {

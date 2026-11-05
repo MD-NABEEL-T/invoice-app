@@ -168,4 +168,46 @@ describe('Month-End Reports Engine', () => {
     expect(docRows[0]['Total Number']).toBe(3);
     expect(docRows[0]['Cancelled']).toBe(1);
   });
+
+  it('includes per-item freight in GSTR-1 B2B taxable value and HSN summary', () => {
+    const invoiceWithFreight = [
+      {
+        id: 'inv-freight',
+        invoice_no: '100/26-27',
+        invoice_date: '2026-10-15',
+        buyer_name: 'TEST BUYER',
+        buyer_gstin: '33AAACR1714R1ZA',
+        buyer_state_code: '33',
+        payable_paise: 123900,
+        status: 'final',
+        lines: [
+          // Item with freight: amount 1000.00 (100000 paise) + freight 50.00 (5000 paise) @ 18%
+          {
+            description: 'Item A',
+            hsn: '3926',
+            unit: 'PCS',
+            qty_milli: 10000,
+            rate_paise: 10000,
+            gst_percent: 18,
+            amount_paise: 100000,
+            freight_paise: 5000,
+          },
+        ],
+      },
+    ];
+
+    const b2bRows = buildGstr1B2bRows(invoiceWithFreight);
+    expect(b2bRows).toHaveLength(1);
+    // Taxable value must be 1050.00 (includes 50.00 freight)
+    expect(b2bRows[0]['Taxable Value']).toBe(1050.00);
+    expect(b2bRows[0]['Invoice Value']).toBe(1239.00);
+
+    const hsnRows = buildGstr1HsnRows(invoiceWithFreight);
+    expect(hsnRows).toHaveLength(1);
+    expect(hsnRows[0]['HSN']).toBe('3926');
+    expect(hsnRows[0]['Taxable Value']).toBe(1050.00);
+    expect(hsnRows[0]['Central Tax Amount']).toBe(94.50);
+    expect(hsnRows[0]['State/UT Tax Amount']).toBe(94.50);
+    expect(hsnRows[0]['Total Value']).toBe(1239.00);
+  });
 });

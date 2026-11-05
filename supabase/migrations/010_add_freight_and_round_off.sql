@@ -3,6 +3,9 @@
 ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS freight_paise bigint DEFAULT 0;
 ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS round_off_paise bigint DEFAULT 0;
 
+-- 1b. Add optional freight_paise column to invoice_lines table
+ALTER TABLE public.invoice_lines ADD COLUMN IF NOT EXISTS freight_paise bigint DEFAULT 0;
+
 -- 2. Make buyer_order_no optional in invoices table (default to empty string)
 ALTER TABLE public.invoices ALTER COLUMN buyer_order_no DROP NOT NULL;
 ALTER TABLE public.invoices ALTER COLUMN buyer_order_no SET DEFAULT '';
@@ -95,7 +98,7 @@ BEGIN
     -- Calculate line amounts and taxes per rate group strictly using CTE
     WITH parsed_lines AS (
         SELECT
-            ROUND((COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::numeric * COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::numeric) / 1000.0)::bigint AS amount_paise,
+            (ROUND((COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::numeric * COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::numeric) / 1000.0)::bigint + COALESCE((l->>'freight_paise'), (l->>'freightPaise'), '0')::bigint) AS amount_paise,
             COALESCE((l->>'gst_percent'), (l->>'gstPercent'))::numeric AS gst_percent
         FROM jsonb_array_elements(v_lines) AS l
     ),
@@ -210,7 +213,8 @@ BEGIN
         qty_milli,
         rate_paise,
         gst_percent,
-        amount_paise
+        amount_paise,
+        freight_paise
     )
     SELECT
         v_invoice_id,
@@ -221,7 +225,8 @@ BEGIN
         COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::bigint,
         COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::bigint,
         COALESCE((l->>'gst_percent'), (l->>'gstPercent'))::numeric,
-        ROUND((COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::numeric * COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::numeric) / 1000.0)::bigint
+        ROUND((COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::numeric * COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::numeric) / 1000.0)::bigint,
+        COALESCE((l->>'freight_paise'), (l->>'freightPaise'), '0')::bigint
     FROM jsonb_array_elements(v_lines) WITH ORDINALITY AS line_data(l, ordinality);
 
     RETURN to_jsonb(v_created_invoice);
@@ -269,7 +274,7 @@ BEGIN
     IF v_lines IS NOT NULL AND jsonb_typeof(v_lines) = 'array' AND jsonb_array_length(v_lines) > 0 THEN
         WITH parsed_lines AS (
             SELECT
-                ROUND((COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::numeric * COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::numeric) / 1000.0)::bigint AS amount_paise,
+                (ROUND((COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::numeric * COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::numeric) / 1000.0)::bigint + COALESCE((l->>'freight_paise'), (l->>'freightPaise'), '0')::bigint) AS amount_paise,
                 COALESCE((l->>'gst_percent'), (l->>'gstPercent'))::numeric AS gst_percent
             FROM jsonb_array_elements(v_lines) AS l
         ),
@@ -339,7 +344,8 @@ BEGIN
             qty_milli,
             rate_paise,
             gst_percent,
-            amount_paise
+            amount_paise,
+            freight_paise
         )
         SELECT
             p_invoice_id,
@@ -350,7 +356,8 @@ BEGIN
             COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::bigint,
             COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::bigint,
             COALESCE((l->>'gst_percent'), (l->>'gstPercent'))::numeric,
-            ROUND((COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::numeric * COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::numeric) / 1000.0)::bigint
+            ROUND((COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::numeric * COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::numeric) / 1000.0)::bigint,
+            COALESCE((l->>'freight_paise'), (l->>'freightPaise'), '0')::bigint
         FROM jsonb_array_elements(v_lines) WITH ORDINALITY AS line_data(l, ordinality);
     END IF;
 

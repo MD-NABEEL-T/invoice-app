@@ -154,6 +154,12 @@ export function buildInvoicePayload({ header = {}, lines = [], roundToRupee = fa
 
     const gstPercent = Number(line.gst_percent ?? line.gstPercent ?? 0);
 
+    const lineFreightPaise = line.freight !== undefined && line.freight !== null && String(line.freight).trim() !== ''
+      ? parseRupeesToPaise(line.freight)
+      : (typeof line.freight_paise === 'number' && line.freight_paise >= 0
+          ? line.freight_paise
+          : parseRupeesToPaise(line.freight_rupees ?? 0));
+
     return {
       line_no: idx + 1,
       description: String(line.description || '').trim(),
@@ -162,9 +168,11 @@ export function buildInvoicePayload({ header = {}, lines = [], roundToRupee = fa
       qtyMilli,
       ratePaise,
       gstPercent,
+      freightPaise: lineFreightPaise,
       qty_milli: qtyMilli,
       rate_paise: ratePaise,
       gst_percent: gstPercent,
+      freight_paise: lineFreightPaise,
     };
   });
 
@@ -205,6 +213,8 @@ export function buildInvoicePayload({ header = {}, lines = [], roundToRupee = fa
       qty_milli: l.qtyMilli,
       rate_paise: l.ratePaise,
       gst_percent: l.gstPercent,
+      amount_paise: l.amountPaise,
+      freight_paise: l.freightPaise || 0,
     })),
   };
 }
