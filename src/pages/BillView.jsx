@@ -633,8 +633,33 @@ export default function BillView() {
                 </span>
               </div>
 
+              {Number(invoice.freight_paise) > 0 && (
+                <div className="flex justify-between text-blue-700 font-semibold">
+                  <span>Freight Charges</span>
+                  <span className="font-mono font-bold">
+                    {formatRupees(invoice.freight_paise)}
+                  </span>
+                </div>
+              )}
+
+              {(() => {
+                const ro = invoice.round_off_paise != null
+                  ? Number(invoice.round_off_paise)
+                  : (Number(invoice.payable_paise || 0) - (Number(invoice.taxable_paise || 0) + Number(invoice.cgst_paise || 0) + Number(invoice.sgst_paise || 0) + Number(invoice.freight_paise || 0)));
+                if (!ro) return null;
+                const sign = ro > 0 ? '+' : '';
+                return (
+                  <div className="flex justify-between text-slate-500 font-semibold">
+                    <span>Round Off</span>
+                    <span className="font-mono font-bold">
+                      {sign}{(ro / 100).toFixed(2)}
+                    </span>
+                  </div>
+                );
+              })()}
+
               <div className="flex justify-between items-baseline pt-2 border-t border-slate-200 text-lg font-black text-slate-900">
-                <span>Grand Total</span>
+                <span>Grand Total (round off)</span>
                 <span className="text-2xl font-mono text-blue-900">
                   {formatRupees(invoice.payable_paise)}
                 </span>

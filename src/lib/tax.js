@@ -33,7 +33,7 @@ export function paiseToRupees(paise) {
  * For inter-state transactions, the entire tax goes to IGST.
  * We NEVER round CGST and SGST halves separately to prevent single-paise drift.
  */
-export function calcInvoice(lines = [], { interState = false, roundToRupee = false } = {}) {
+export function calcInvoice(lines = [], { interState = false, roundToRupee = false, freightPaise = 0 } = {}) {
   // Calculate per-line taxable amount in paise:
   // qtyMilli is integer thousandths (1 unit = 1000, 2.5 kg = 2500)
   const calculatedLines = lines.map((line) => {
@@ -100,14 +100,16 @@ export function calcInvoice(lines = [], { interState = false, roundToRupee = fal
     });
   }
 
-  const grandTotalPaise = totalTaxablePaise + totalTaxPaise;
+  const subtotalPaise = totalTaxablePaise + totalTaxPaise;
+  const freightAmtPaise = Number(freightPaise) || 0;
+  const totalBeforeRoundOffPaise = subtotalPaise + freightAmtPaise;
   let roundOffPaise = 0;
-  let payablePaise = grandTotalPaise;
+  let payablePaise = totalBeforeRoundOffPaise;
 
   if (roundToRupee) {
     // Round to nearest whole rupee (100 paise)
-    payablePaise = Math.round(grandTotalPaise / 100) * 100;
-    roundOffPaise = payablePaise - grandTotalPaise;
+    payablePaise = Math.round(totalBeforeRoundOffPaise / 100) * 100;
+    roundOffPaise = payablePaise - totalBeforeRoundOffPaise;
   }
 
   return {
@@ -118,7 +120,9 @@ export function calcInvoice(lines = [], { interState = false, roundToRupee = fal
     totalSgstPaise,
     totalIgstPaise,
     totalTaxPaise,
-    grandTotalPaise,
+    freightPaise: freightAmtPaise,
+    subtotalPaise,
+    grandTotalPaise: totalBeforeRoundOffPaise,
     roundOffPaise,
     payablePaise,
   };

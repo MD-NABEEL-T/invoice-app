@@ -212,15 +212,16 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
     const r2MaxLines = Math.max(1, r2LabelC.length, r2ValDE.length, r2LabelF.length, r2ValGH.length);
     const row2H = Math.max(14.0, r2MaxLines * 4.8 + 2.5);
 
-    // Row 3 heights (Buyer order & date, supports multiline):
+    // Row 3 heights (Buyer order & date, supports multiline; hidden if empty):
+    const hasBuyerOrder = Boolean(invoice.buyer_order_no && String(invoice.buyer_order_no).trim());
     doc.setFontSize(11);
-    const r3LabelC = getWrappedLines(doc, 'Buyer Order:', COL_WIDTHS[2] - 2.0, COL_WIDTHS[2]);
+    const r3LabelC = getWrappedLines(doc, hasBuyerOrder ? 'Buyer Order:' : '', COL_WIDTHS[2] - 2.0, COL_WIDTHS[2]);
     doc.setFontSize(12);
-    const r3ValDE = getWrappedLines(doc, invoice.buyer_order_no || '-', deW - 2.4, deW);
+    const r3ValDE = getWrappedLines(doc, hasBuyerOrder ? invoice.buyer_order_no : '', deW - 2.4, deW);
     doc.setFontSize(11);
-    const r3LabelF = getWrappedLines(doc, 'Dated:', COL_WIDTHS[5] - 2.0, COL_WIDTHS[5]);
+    const r3LabelF = getWrappedLines(doc, hasBuyerOrder && invoice.buyer_order_date ? 'Dated:' : '', COL_WIDTHS[5] - 2.0, COL_WIDTHS[5]);
     doc.setFontSize(12);
-    const r3ValGH = getWrappedLines(doc, invoice.buyer_order_date ? toDisplayDate(invoice.buyer_order_date) : '-', ghW - 2.4, ghW);
+    const r3ValGH = getWrappedLines(doc, hasBuyerOrder && invoice.buyer_order_date ? toDisplayDate(invoice.buyer_order_date) : '', ghW - 2.4, ghW);
     const r3MaxLines = Math.max(1, r3LabelC.length, r3ValDE.length, r3LabelF.length, r3ValGH.length);
     const row3H = Math.max(14.0, r3MaxLines * 4.6 + 2.5);
 
@@ -577,6 +578,36 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
       y += taxRowH;
     });
 
+    // Freight row (if freight_paise > 0)
+    const freightPaise = Number(invoice.freight_paise) || 0;
+    if (freightPaise > 0) {
+      for (let c = 0; c < 8; c++) drawBox(doc, COL_X[c], y, COL_WIDTHS[c], taxRowH);
+      drawCell(doc, 'Freight Charges', COL_X[1], y, COL_WIDTHS[1], taxRowH, { fontSize: 12, fontStyle: 'normal', align: 'left', valign: 'middle', fontName, padding: 1.2 });
+      drawCell(doc, formatPlainAmount(freightPaise), COL_X[7], y, COL_WIDTHS[7], taxRowH, { fontSize: 12, fontStyle: 'normal', align: 'right', valign: 'middle', fontName, padding: 1.2 });
+      y += taxRowH;
+    }
+
+    // Round Off row (+/- paise so numbers add up)
+    const totalTaxPaise = rateGroups.reduce((acc, g) => acc + (g.cgstPaise || 0) + (g.sgstPaise || 0), 0);
+    const lineTaxableSum = (invoice.lines || []).reduce((acc, l) => {
+      const q = l.qty_milli || 0;
+      const r = l.rate_paise || 0;
+      return acc + (l.amount_paise != null ? Number(l.amount_paise) : Math.round((q * r) / 1000));
+    }, 0);
+    const subtotalBeforeRound = lineTaxableSum + totalTaxPaise + freightPaise;
+    const roundOffPaise = invoice.round_off_paise != null
+      ? Number(invoice.round_off_paise)
+      : (invoice.payable_paise != null ? (Number(invoice.payable_paise) - subtotalBeforeRound) : 0);
+
+    if (roundOffPaise !== 0) {
+      for (let c = 0; c < 8; c++) drawBox(doc, COL_X[c], y, COL_WIDTHS[c], taxRowH);
+      drawCell(doc, 'Round Off', COL_X[1], y, COL_WIDTHS[1], taxRowH, { fontSize: 12, fontStyle: 'normal', align: 'left', valign: 'middle', fontName, padding: 1.2 });
+      const sign = roundOffPaise > 0 ? '+' : '';
+      const roundOffFormatted = `${sign}${(roundOffPaise / 100).toFixed(2)}`;
+      drawCell(doc, roundOffFormatted, COL_X[7], y, COL_WIDTHS[7], taxRowH, { fontSize: 12, fontStyle: 'normal', align: 'right', valign: 'middle', fontName, padding: 1.2 });
+      y += taxRowH;
+    }
+
     // -------------------------------------------------------------
     // GRAND TOTAL(ROUND OFF) ROW (7.5mm): A:B merged 12pt bold centered label;
     // C:H merged 14pt bold value right-aligned, vertically centered, boxed.
@@ -704,23 +735,24 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
     // -------------------------------------------------------------
     y += 2.5;
 
-    // Declaration: 10pt left
+    // Declaration: 11pt left
     doc.setFont(fontName, 'normal');
-    doc.setFontSize(10);
+    doc.setFontSize(11);
     const decText = `Declaration: ${firm.declaration || DEFAULT_FIRM.declaration}`;
     doc.text(decText, COL_X[0], y + 3.2);
-    y += 6.5;
+    y += 7.0;
 
-    // "For Khansa Enterprises" (11pt regular, right-aligned)
-    doc.setFontSize(11);
+    // "For Khansa Enterprises" (11.5pt bold, right-aligned)
+    doc.setFont(fontName, 'bold');
+    doc.setFontSize(11.5);
     doc.text(`For ${firm.name || 'Khansa Enterprises'}`, COL_X[8], y + 3.2, { align: 'right' });
     y += 16.0; // ~15mm blank space for signing
 
-    // Signatures (11pt bold)
+    // Signatures (12pt bold)
     doc.setFont(fontName, 'bold');
-    doc.setFontSize(11);
+    doc.setFontSize(12);
     doc.text('Customers Seal and Signature', COL_X[0], y);
-    doc.text('Authorised Signature', COL_X[8], y, { align: 'right' });
+    doc.text('Authorised Signatory', COL_X[8], y, { align: 'right' });
 
     // Cancelled Watermark Stamp if invoice is cancelled
     if (isCancelled) {

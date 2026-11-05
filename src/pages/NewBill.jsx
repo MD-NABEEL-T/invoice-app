@@ -63,6 +63,7 @@ export default function NewBill() {
   const [despatchedThrough, setDespatchedThrough] = useState('');
   const [destination, setDestination] = useState('');
   const [termsOfDelivery, setTermsOfDelivery] = useState('');
+  const [freightAmount, setFreightAmount] = useState('');
 
   // Date sequence check warning
   const [latestBillWarning, setLatestBillWarning] = useState(null);
@@ -237,6 +238,7 @@ export default function NewBill() {
               if (draft.despatchedThrough) setDespatchedThrough(draft.despatchedThrough);
               if (draft.destination) setDestination(draft.destination);
               if (draft.termsOfDelivery) setTermsOfDelivery(draft.termsOfDelivery);
+              if (draft.freightAmount !== undefined && draft.freightAmount !== null) setFreightAmount(String(draft.freightAmount));
               if (Array.isArray(draft.lines) && draft.lines.length > 0) {
                 setLines(draft.lines);
               }
@@ -290,6 +292,8 @@ export default function NewBill() {
         if (inv.despatched_through) setDespatchedThrough(String(inv.despatched_through));
         if (inv.destination) setDestination(String(inv.destination));
         if (inv.terms_of_delivery) setTermsOfDelivery(String(inv.terms_of_delivery));
+        if (inv.freight_paise) setFreightAmount(paiseToRupees(inv.freight_paise));
+        else if (inv.freight) setFreightAmount(String(inv.freight));
 
         if (Array.isArray(inv.lines) && inv.lines.length > 0) {
           const sorted = [...inv.lines].sort((a, b) => (a.line_no || 0) - (b.line_no || 0));
@@ -357,6 +361,8 @@ export default function NewBill() {
         if (inv.despatched_through) setDespatchedThrough(String(inv.despatched_through));
         if (inv.destination) setDestination(String(inv.destination));
         if (inv.terms_of_delivery) setTermsOfDelivery(String(inv.terms_of_delivery));
+        if (inv.freight_paise) setFreightAmount(paiseToRupees(inv.freight_paise));
+        else if (inv.freight) setFreightAmount(String(inv.freight));
 
         if (Array.isArray(inv.lines) && inv.lines.length > 0) {
           const sorted = [...inv.lines].sort((a, b) => (a.line_no || 0) - (b.line_no || 0));
@@ -476,6 +482,7 @@ export default function NewBill() {
         despatchedThrough,
         destination,
         termsOfDelivery,
+        freightAmount,
         lines,
       };
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftState));
@@ -494,6 +501,7 @@ export default function NewBill() {
     despatchedThrough,
     destination,
     termsOfDelivery,
+    freightAmount,
     lines,
   ]);
 
@@ -699,8 +707,9 @@ export default function NewBill() {
       ratePaise: parseRupeesToPaise(l.rate),
       gstPercent: Number(l.gst_percent || 0),
     }));
-    return calcInvoice(parsedLines);
-  }, [lines]);
+    const freightPaise = parseRupeesToPaise(freightAmount);
+    return calcInvoice(parsedLines, { roundToRupee: true, freightPaise });
+  }, [lines, freightAmount]);
 
   // Selected buyer object
   const selectedBuyer = useMemo(() => {
@@ -723,7 +732,13 @@ export default function NewBill() {
       buyer_state_code: selectedBuyer?.state_code || '33',
       buyer_address: chosenAddress,
       buyer_order_no: buyerOrderNo,
+      buyer_order_date: buyerOrderDate || null,
+      delivery_no: deliveryNo || null,
+      delivery_date: deliveryDate || null,
       despatched_through: despatchedThrough,
+      destination: destination || null,
+      terms_of_delivery: termsOfDelivery || null,
+      freight_paise: parseRupeesToPaise(freightAmount),
     };
 
     const val = validateBillForm({ header, lines });
@@ -757,9 +772,10 @@ export default function NewBill() {
         despatched_through: despatchedThrough,
         destination: destination || null,
         terms_of_delivery: termsOfDelivery || null,
+        freight_paise: parseRupeesToPaise(freightAmount),
       };
 
-      const payload = buildInvoicePayload({ header, lines });
+      const payload = buildInvoicePayload({ header, lines, roundToRupee: true });
 
       // Webhook dispatch helper for email and Google Sheets automation
       const sendBillEmailWebhook = (invoiceNo, isEdit = false) => {
@@ -789,6 +805,8 @@ export default function NewBill() {
             despatched_through: header.despatched_through,
             destination: header.destination,
             terms_of_delivery: header.terms_of_delivery,
+            freight_paise: payload.freight_paise,
+            round_off_paise: payload.round_off_paise,
             lines: lines.map((l, idx) => ({
               line_no: idx + 1,
               description: l.description,
@@ -831,10 +849,14 @@ export default function NewBill() {
           taxable_paise: payload.taxable_paise,
           cgst_paise: payload.cgst_paise,
           sgst_paise: payload.sgst_paise,
+          freight_paise: payload.freight_paise,
+          round_off_paise: payload.round_off_paise,
           payable_paise: payload.payable_paise,
           taxable_rupees: (payload.taxable_paise / 100).toFixed(2),
           cgst_rupees: (payload.cgst_paise / 100).toFixed(2),
           sgst_rupees: (payload.sgst_paise / 100).toFixed(2),
+          freight_rupees: (payload.freight_paise / 100).toFixed(2),
+          round_off_rupees: (payload.round_off_paise / 100).toFixed(2),
           payable_rupees: (payload.payable_paise / 100).toFixed(2),
           pdf_base64: pdfBase64,
           lines: lines.map((l) => {
@@ -904,7 +926,7 @@ export default function NewBill() {
 
         if (rpcErr) {
           console.warn('RPC update_invoice error, using direct table update fallback:', rpcErr);
-          const { error: invErr } = await supabase.from('invoices').update({
+          const updateData = {
             invoice_date: header.invoice_date,
             buyer_id: header.buyer_id,
             buyer_name: header.buyer_name,
@@ -917,12 +939,21 @@ export default function NewBill() {
             delivery_date: header.delivery_date,
             despatched_through: header.despatched_through,
             destination: header.destination,
+            terms_of_delivery: header.terms_of_delivery,
             taxable_paise: payload.taxable_paise,
             cgst_paise: payload.cgst_paise,
             sgst_paise: payload.sgst_paise,
             payable_paise: payload.payable_paise,
-          }).eq('id', editBillId);
-          if (invErr) throw invErr;
+            freight_paise: payload.freight_paise || 0,
+            round_off_paise: payload.round_off_paise || 0,
+          };
+          const { error: invErr } = await supabase.from('invoices').update(updateData).eq('id', editBillId);
+          if (invErr) {
+            delete updateData.freight_paise;
+            delete updateData.round_off_paise;
+            const { error: retryErr } = await supabase.from('invoices').update(updateData).eq('id', editBillId);
+            if (retryErr) throw retryErr;
+          }
 
           await supabase.from('invoice_lines').delete().eq('invoice_id', editBillId);
           const lineInserts = lines.map((l, idx) => {
@@ -973,33 +1004,54 @@ export default function NewBill() {
         const nextNum = lastNum + 1;
         const invoiceNo = `${String(nextNum).padStart(3, '0')}/${fy}`;
 
-        const { data: directInv, error: directInvErr } = await supabase
+        const insertData = {
+          invoice_no: invoiceNo,
+          number: nextNum,
+          fy,
+          invoice_date: header.invoice_date,
+          status: 'final',
+          buyer_id: header.buyer_id,
+          buyer_name: header.buyer_name,
+          buyer_gstin: header.buyer_gstin,
+          buyer_state_code: header.buyer_state_code || '33',
+          buyer_address: header.buyer_address || 'MELVISHARAM, TAMIL NADU',
+          delivery_no: header.delivery_no || null,
+          delivery_date: header.delivery_date || null,
+          buyer_order_no: header.buyer_order_no || null,
+          buyer_order_date: header.buyer_order_date || null,
+          despatched_through: header.despatched_through || '',
+          destination: header.destination || null,
+          terms_of_delivery: header.terms_of_delivery || null,
+          taxable_paise: payload.taxable_paise,
+          cgst_paise: payload.cgst_paise,
+          sgst_paise: payload.sgst_paise,
+          payable_paise: payload.payable_paise,
+          freight_paise: payload.freight_paise || 0,
+          round_off_paise: payload.round_off_paise || 0,
+        };
+
+        let directInv = null;
+        let directInvErr = null;
+
+        const res1 = await supabase
           .from('invoices')
-          .insert({
-            invoice_no: invoiceNo,
-            number: nextNum,
-            fy,
-            invoice_date: header.invoice_date,
-            status: 'final',
-            buyer_id: header.buyer_id,
-            buyer_name: header.buyer_name,
-            buyer_gstin: header.buyer_gstin,
-            buyer_state_code: header.buyer_state_code || '33',
-            buyer_address: header.buyer_address || 'MELVISHARAM, TAMIL NADU',
-            delivery_no: header.delivery_no || null,
-            delivery_date: header.delivery_date || null,
-            buyer_order_no: header.buyer_order_no,
-            buyer_order_date: header.buyer_order_date || null,
-            despatched_through: header.despatched_through,
-            destination: header.destination || null,
-            terms_of_delivery: header.terms_of_delivery || null,
-            taxable_paise: payload.taxable_paise,
-            cgst_paise: payload.cgst_paise,
-            sgst_paise: payload.sgst_paise,
-            payable_paise: payload.payable_paise,
-          })
+          .insert(insertData)
           .select('id, invoice_no')
           .single();
+
+        if (res1.error) {
+          delete insertData.freight_paise;
+          delete insertData.round_off_paise;
+          const res2 = await supabase
+            .from('invoices')
+            .insert(insertData)
+            .select('id, invoice_no')
+            .single();
+          directInv = res2.data;
+          directInvErr = res2.error;
+        } else {
+          directInv = res1.data;
+        }
 
         if (directInvErr) throw directInvErr;
 
@@ -1342,14 +1394,13 @@ export default function NewBill() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           <div>
             <label className="block text-base font-bold text-slate-900 mb-1">
-              Buyer Order No *
+              Buyer Order No (Optional)
             </label>
             <input
               type="text"
-              required
               value={buyerOrderNo}
               onChange={(e) => setBuyerOrderNo(e.target.value.toUpperCase())}
-              placeholder="e.g. PO-1046"
+              placeholder="e.g. PO-1046 or leave blank"
               className="w-full min-h-[50px] px-4 py-3 rounded-2xl border-2 border-slate-400 text-slate-900 text-base font-bold uppercase"
             />
           </div>
@@ -1765,6 +1816,37 @@ export default function NewBill() {
         </datalist>
       </div>
 
+      {/* SECTION 2.5: FREIGHT CHARGES (OPTIONAL) */}
+      <div className="bg-white rounded-3xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <label className="block text-base font-black text-slate-900">
+              Freight Charges (Optional)
+            </label>
+            <p className="text-xs font-semibold text-slate-500">
+              Separate transport amount added below items table (no HSN, no GST).
+            </p>
+          </div>
+          <div className="w-full sm:w-56">
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center font-bold text-slate-400">
+                ₹
+              </span>
+              <input
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+                value={freightAmount}
+                onChange={(e) => setFreightAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full min-h-[48px] pl-8 pr-3 py-2 rounded-2xl border-2 border-slate-300 text-slate-900 text-base font-bold text-right font-mono"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* SECTION 3: LIVE TOTALS (RATE-GROUP BREAKDOWN & GRAND TOTAL) */}
       <div className="bg-white rounded-3xl border-2 border-slate-300 p-5 sm:p-6 shadow-sm space-y-4">
         <h3 className="text-lg font-black text-slate-900 border-b border-slate-200 pb-2">
@@ -1825,8 +1907,28 @@ export default function NewBill() {
               {formatRupees(calculatedInvoice.totalSgstPaise)}
             </span>
           </div>
+
+          {calculatedInvoice.freightPaise > 0 && (
+            <div className="flex justify-between font-semibold text-blue-700">
+              <span>Freight Charges</span>
+              <span className="font-mono font-bold">
+                {formatRupees(calculatedInvoice.freightPaise)}
+              </span>
+            </div>
+          )}
+
+          {calculatedInvoice.roundOffPaise !== 0 && (
+            <div className="flex justify-between font-semibold text-slate-500">
+              <span>Round Off</span>
+              <span className="font-mono font-bold">
+                {calculatedInvoice.roundOffPaise > 0 ? '+' : ''}
+                {(calculatedInvoice.roundOffPaise / 100).toFixed(2)}
+              </span>
+            </div>
+          )}
+
           <div className="flex justify-between items-baseline pt-2 border-t border-slate-200 text-lg font-black text-slate-900">
-            <span>Grand Total</span>
+            <span>Grand Total (round off)</span>
             <span className="text-2xl font-mono text-blue-900">
               {formatRupees(calculatedInvoice.payablePaise)}
             </span>

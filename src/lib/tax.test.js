@@ -105,6 +105,24 @@ describe('GST Tax Calculation Engine', () => {
     expect(result.totalTaxPaise).toBe(51750);
   });
 
+  it('supports optional freight charges and rounds grand total to whole rupee', () => {
+    const lines = [
+      { qtyMilli: 1000, ratePaise: rupeesToPaise(625.0), gstPercent: 5 },
+      { qtyMilli: 1000, ratePaise: rupeesToPaise(500.0), gstPercent: 18 },
+    ];
+    // Taxable 1125.00, Tax 121.25 -> 1246.25. Add Freight 200.00 -> 1446.25.
+    // Nearest rupee -> 1446.00, roundOff = -0.25
+    const result = calcInvoice(lines, { roundToRupee: true, freightPaise: 20000 });
+
+    expect(result.totalTaxablePaise).toBe(112500);
+    expect(result.totalTaxPaise).toBe(12125);
+    expect(result.freightPaise).toBe(20000);
+    expect(result.grandTotalPaise).toBe(144625);
+    expect(result.roundOffPaise).toBe(-25);
+    expect(result.payablePaise).toBe(144600);
+    expect(paiseToRupees(result.payablePaise)).toBe('1446.00');
+  });
+
   // Test E: edge cases
   describe('E) Edge cases', () => {
     it('handles empty line items gracefully', () => {

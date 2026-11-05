@@ -141,6 +141,8 @@ function buildNotificationEmailHtml(data, action) {
   const taxableRupees = data.taxable_rupees || (data.taxable_paise ? (data.taxable_paise / 100).toFixed(2) : '0.00');
   const cgstRupees = data.cgst_rupees || (data.cgst_paise ? (data.cgst_paise / 100).toFixed(2) : '0.00');
   const sgstRupees = data.sgst_rupees || (data.sgst_paise ? (data.sgst_paise / 100).toFixed(2) : '0.00');
+  const freightRupees = data.freight_rupees || (data.freight_paise ? (data.freight_paise / 100).toFixed(2) : null);
+  const roundOffRupees = data.round_off_rupees || (data.round_off_paise ? (data.round_off_paise / 100).toFixed(2) : null);
   const lines = data.lines || [];
 
   let rowsHtml = '';
@@ -215,6 +217,16 @@ function buildNotificationEmailHtml(data, action) {
               '<span style="color: #64748b;">State Tax (SGST):</span>' +
               '<strong style="color: #0f172a;">Rs. ' + sgstRupees + '</strong>' +
             '</div>' +
+            (freightRupees && Number(freightRupees) > 0 ?
+              '<div style="display: flex; justify-content: space-between; margin-bottom: 6px;">' +
+                '<span style="color: #64748b;">Freight Charges:</span>' +
+                '<strong style="color: #0f172a;">Rs. ' + freightRupees + '</strong>' +
+              '</div>' : '') +
+            (roundOffRupees && Number(roundOffRupees) !== 0 ?
+              '<div style="display: flex; justify-content: space-between; margin-bottom: 6px;">' +
+                '<span style="color: #64748b;">Round Off:</span>' +
+                '<strong style="color: #0f172a;">' + (Number(roundOffRupees) > 0 ? '+' : '') + roundOffRupees + '</strong>' +
+              '</div>' : '') +
             '<div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px dashed #cbd5e1; font-size: 16px;">' +
               '<span style="font-weight: 800; color: #0f172a;">Grand Total:</span>' +
               '<strong style="color: #1e40af; font-size: 18px;">Rs. ' + payableRupees + '</strong>' +

@@ -110,10 +110,6 @@ export function validateBillForm({ header = {}, lines = [] } = {}) {
     errors.push('Bill date is required');
   }
 
-  if (!header.buyer_order_no || !String(header.buyer_order_no).trim()) {
-    errors.push('Buyer Order No is required');
-  }
-
   if (!Array.isArray(lines) || lines.length === 0) {
     errors.push('Add at least one line item');
   } else {
@@ -169,7 +165,11 @@ export function buildInvoicePayload({ header = {}, lines = [], roundToRupee = fa
   });
 
   // Calculate live invoice totals
-  const invoiceCalc = calcInvoice(normalizedLines, { roundToRupee, interState: false });
+  const freightPaise = header.freight_paise !== undefined
+    ? Number(header.freight_paise) || 0
+    : parseRupeesToPaise(header.freight || header.freight_rupees || 0);
+
+  const invoiceCalc = calcInvoice(normalizedLines, { roundToRupee, interState: false, freightPaise });
 
   return {
     invoice_date: header.invoice_date,
@@ -187,6 +187,8 @@ export function buildInvoicePayload({ header = {}, lines = [], roundToRupee = fa
     despatched_through: String(header.despatched_through || '').trim(),
     destination: header.destination ? String(header.destination).trim() : null,
     terms_of_delivery: header.terms_of_delivery ? String(header.terms_of_delivery).trim() : null,
+    freight_paise: invoiceCalc.freightPaise,
+    round_off_paise: invoiceCalc.roundOffPaise,
     taxable_paise: invoiceCalc.totalTaxablePaise,
     cgst_paise: invoiceCalc.totalCgstPaise,
     sgst_paise: invoiceCalc.totalSgstPaise,

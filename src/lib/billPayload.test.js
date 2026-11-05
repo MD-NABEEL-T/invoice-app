@@ -81,8 +81,8 @@ describe('billPayload helpers', () => {
       expect(emptyForm.errors).toContain('Buyer selection is required');
       expect(emptyForm.errors).toContain('Branch delivery address is required');
       expect(emptyForm.errors).toContain('Bill date is required');
-      expect(emptyForm.errors).toContain('Buyer Order No is required');
-      // Despatched Through is now optional
+      // Buyer Order No and Despatched Through are optional
+      expect(emptyForm.errors).not.toContain('Buyer Order No is required');
       expect(emptyForm.errors).not.toContain('Despatched Through is required');
       expect(emptyForm.errors).toContain('Add at least one line item');
     });

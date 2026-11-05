@@ -310,21 +310,21 @@ export function InvoicePage({
               </div>
             </div>
 
-            {/* Row 3: Buyer Order: (11pt bold) | order no (12pt bold) ; Dated: (11pt bold) | date (12pt bold) */}
+            {/* Row 3: Buyer Order: (11pt bold) | order no (12pt bold) ; Dated: (11pt bold) | date (12pt bold) - hidden if empty */}
             <div className="flex font-bold" style={{ borderBottom: '1px solid #000000', minHeight: '66px', display: 'flex' }}>
               <div className="p-1.5 text-[11pt]" style={{ width: '17.99%', borderRight: '1px solid #000000' }}>
-                Buyer Order:
+                {invoice.buyer_order_no ? 'Buyer Order:' : ''}
               </div>
               <div className="p-1.5 text-[12pt] whitespace-pre-line" style={{ width: '27.89%', borderRight: '1px solid #000000' }}>
-                {invoice.buyer_order_no || '-'}
+                {invoice.buyer_order_no || ''}
               </div>
               <div className="p-1.5 text-[11pt]" style={{ width: '15.67%', borderRight: '1px solid #000000' }}>
-                Dated:
+                {invoice.buyer_order_no && invoice.buyer_order_date ? 'Dated:' : ''}
               </div>
               <div className="p-1.5 text-[12pt] whitespace-pre-line" style={{ width: '38.45%' }}>
-                {invoice.buyer_order_date
+                {invoice.buyer_order_no && invoice.buyer_order_date
                   ? invoice.buyer_order_date.split('\n').map((d) => formatDisplayDate(d) || d).join('\n')
-                  : '-'}
+                  : ''}
               </div>
             </div>
 
@@ -509,6 +509,58 @@ export function InvoicePage({
               </React.Fragment>
             ))}
 
+            {/* Freight row (if freight_paise > 0) */}
+            {isLast && Number(invoice.freight_paise) > 0 && (
+              <tr style={{ borderBottom: '1px solid #000000', height: '32px' }}>
+                <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                <td className="py-1 px-2 text-left font-normal text-[12pt]" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
+                  Freight Charges
+                </td>
+                <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                <td className="py-1 px-2 text-right font-normal text-[12pt]" style={{ borderBottom: '1px solid #000000' }}>
+                  {formatPlainAmount(invoice.freight_paise)}
+                </td>
+              </tr>
+            )}
+
+            {/* Round Off row (+/- paise) */}
+            {isLast && (() => {
+              const freight = Number(invoice.freight_paise) || 0;
+              const totalTax = rateGroups.reduce((acc, g) => acc + (g.cgstPaise || 0) + (g.sgstPaise || 0), 0);
+              const lineTaxableSum = (invoice.lines || []).reduce((acc, l) => {
+                const q = l.qty_milli || 0;
+                const r = l.rate_paise || 0;
+                return acc + (l.amount_paise != null ? Number(l.amount_paise) : Math.round((q * r) / 1000));
+              }, 0);
+              const subtotalBeforeRound = lineTaxableSum + totalTax + freight;
+              const ro = invoice.round_off_paise != null
+                ? Number(invoice.round_off_paise)
+                : (invoice.payable_paise != null ? (Number(invoice.payable_paise) - subtotalBeforeRound) : 0);
+
+              if (ro === 0) return null;
+              const sign = ro > 0 ? '+' : '';
+              return (
+                <tr style={{ borderBottom: '1px solid #000000', height: '32px' }}>
+                  <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                  <td className="py-1 px-2 text-left font-normal text-[12pt]" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
+                    Round Off
+                  </td>
+                  <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                  <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                  <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                  <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                  <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
+                  <td className="py-1 px-2 text-right font-normal text-[12pt]" style={{ borderBottom: '1px solid #000000' }}>
+                    {sign}{(ro / 100).toFixed(2)}
+                  </td>
+                </tr>
+              );
+            })()}
+
             {/* Final Page: Grand Total Row (A:B 12pt bold centered, C:H 14pt bold right-aligned) */}
             {isLast && (
               <tr
@@ -682,23 +734,23 @@ export function InvoicePage({
       {/* FOOTER (Strictly outside table box, NO borders) */}
       {isLast && (
         <div className="pt-3 text-black">
-          {/* Declaration: 10pt left */}
-          <div className="text-[10pt] leading-tight pb-3 font-normal">
+          {/* Declaration: 11pt left */}
+          <div className="text-[11pt] leading-tight pb-3 font-normal">
             Declaration: {firm.declaration || DEFAULT_FIRM.declaration}
           </div>
 
-          {/* For Khansa Enterprises: right-aligned, 11pt regular */}
-          <div className="text-right text-[11pt] font-normal">
+          {/* For Khansa Enterprises: right-aligned, 11.5pt semibold */}
+          <div className="text-right text-[11.5pt] font-semibold">
             For {firm.name || 'Khansa Enterprises'}
           </div>
 
           {/* ~16mm blank space for signing */}
           <div style={{ height: '60px' }}></div>
 
-          {/* Signatures: 11pt bold */}
-          <div className="flex justify-between items-end text-[11pt] font-bold">
+          {/* Signatures: 12pt bold */}
+          <div className="flex justify-between items-end text-[12pt] font-bold">
             <div>Customers Seal and Signature</div>
-            <div>Authorised Signature</div>
+            <div>Authorised Signatory</div>
           </div>
         </div>
       )}
