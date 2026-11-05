@@ -207,7 +207,7 @@ export function InvoicePage({
           }}
         >
           <h1
-            className="text-[13pt] font-bold uppercase tracking-wider m-0 leading-tight"
+            className="text-[14pt] font-bold uppercase tracking-wider m-0 leading-tight"
             style={{ color: '#000000' }}
           >
             TAX INVOICE
@@ -229,7 +229,7 @@ export function InvoicePage({
             {/* Rows 2-4: Firm Details (Centered, bold, top-aligned) */}
             <div className="p-2 text-center" style={{ minHeight: '170px' }}>
               <h2
-                className="text-[12pt] font-bold uppercase tracking-wide leading-tight mb-1"
+                className="text-[15pt] font-bold uppercase tracking-wide leading-tight mb-1"
                 style={{ color: '#000000' }}
               >
                 {firm.name || 'KHANSA ENTERPRISES'}
@@ -255,7 +255,7 @@ export function InvoicePage({
               </div>
             </div>
 
-            {/* Rows 5-6: Buyer Section (Boxed, bold, centered with "Buyer:" at top-left) */}
+            {/* Rows 5-6: Buyer Section (Boxed, bold, centered with "Buyer:" alone on first line) */}
             <div
               className="p-2"
               style={{
@@ -266,18 +266,18 @@ export function InvoicePage({
               <span className="text-[11pt] font-bold block text-left" style={{ color: '#000000' }}>
                 Buyer:
               </span>
-              <div className="text-center">
-                <p className="text-[11.5pt] font-bold uppercase leading-tight mb-1" style={{ color: '#000000' }}>
+              <div className="text-center pt-1">
+                <p className="text-[13pt] font-bold uppercase leading-tight mb-1" style={{ color: '#000000' }}>
                   {invoice.buyer_name}
                 </p>
                 <div
-                  className="text-[10.5pt] whitespace-pre-line leading-tight font-bold"
+                  className="text-[11pt] whitespace-pre-line leading-tight font-bold"
                   style={{ color: '#000000' }}
                 >
                   {invoice.buyer_address}
                 </div>
                 {invoice.buyer_gstin && (
-                  <p className="text-[10.5pt] font-bold pt-1" style={{ color: '#000000' }}>
+                  <p className="text-[11pt] font-bold pt-1" style={{ color: '#000000' }}>
                     GSTIN:{invoice.buyer_gstin}
                   </p>
                 )}
@@ -294,77 +294,77 @@ export function InvoicePage({
               fontSize: '11pt',
             }}
           >
-            {/* Row 2: INVOICE No: | no ; Dated: | date */}
+            {/* Row 2: INVOICE No: (11pt bold) | no (14pt bold) ; Dated: (11pt bold) | date (13pt bold) */}
             <div className="flex font-bold" style={{ borderBottom: '1px solid #000000', minHeight: '66px', display: 'flex' }}>
-              <div className="p-1.5" style={{ width: '17.99%', borderRight: '1px solid #000000' }}>
+              <div className="p-1.5 text-[11pt]" style={{ width: '17.99%', borderRight: '1px solid #000000' }}>
                 INVOICE No:
               </div>
-              <div className="p-1.5" style={{ width: '27.89%', borderRight: '1px solid #000000' }}>
+              <div className="p-1.5 text-[14pt]" style={{ width: '27.89%', borderRight: '1px solid #000000' }}>
                 {invoice.invoice_no || '-'}
               </div>
-              <div className="p-1.5" style={{ width: '15.67%', borderRight: '1px solid #000000' }}>
+              <div className="p-1.5 text-[11pt]" style={{ width: '15.67%', borderRight: '1px solid #000000' }}>
                 Dated:
               </div>
-              <div className="p-1.5" style={{ width: '38.45%' }}>
+              <div className="p-1.5 text-[13pt]" style={{ width: '38.45%' }}>
                 {formatDisplayDate(invoice.invoice_date) || '-'}
               </div>
             </div>
 
-            {/* Row 3: Buyer Order: | order no ; Dated: | date */}
+            {/* Row 3: Buyer Order: (11pt bold) | order no (12pt bold) ; Dated: (11pt bold) | date (12pt bold) */}
             <div className="flex font-bold" style={{ borderBottom: '1px solid #000000', minHeight: '66px', display: 'flex' }}>
-              <div className="p-1.5" style={{ width: '17.99%', borderRight: '1px solid #000000' }}>
+              <div className="p-1.5 text-[11pt]" style={{ width: '17.99%', borderRight: '1px solid #000000' }}>
                 Buyer Order:
               </div>
-              <div className="p-1.5 whitespace-pre-line" style={{ width: '27.89%', borderRight: '1px solid #000000' }}>
+              <div className="p-1.5 text-[12pt] whitespace-pre-line" style={{ width: '27.89%', borderRight: '1px solid #000000' }}>
                 {invoice.buyer_order_no || '-'}
               </div>
-              <div className="p-1.5" style={{ width: '15.67%', borderRight: '1px solid #000000' }}>
+              <div className="p-1.5 text-[11pt]" style={{ width: '15.67%', borderRight: '1px solid #000000' }}>
                 Dated:
               </div>
-              <div className="p-1.5 whitespace-pre-line" style={{ width: '38.45%' }}>
+              <div className="p-1.5 text-[12pt] whitespace-pre-line" style={{ width: '38.45%' }}>
                 {invoice.buyer_order_date
                   ? invoice.buyer_order_date.split('\n').map((d) => formatDisplayDate(d) || d).join('\n')
                   : '-'}
               </div>
             </div>
 
-            {/* Row 4: Delivery No: | no ; Delivery Dt: | date */}
+            {/* Row 4: Delivery No: (11pt bold) | no (12pt bold) ; Delivery Dt: (11pt bold) | date (12pt bold) */}
             <div className="flex font-bold" style={{ borderBottom: '1px solid #000000', minHeight: '38px', display: 'flex' }}>
-              <div className="p-1.5" style={{ width: '17.99%', borderRight: '1px solid #000000' }}>
+              <div className="p-1.5 text-[11pt]" style={{ width: '17.99%', borderRight: '1px solid #000000' }}>
                 Delivery No:
               </div>
-              <div className="p-1.5" style={{ width: '27.89%', borderRight: '1px solid #000000' }}>
+              <div className="p-1.5 text-[12pt]" style={{ width: '27.89%', borderRight: '1px solid #000000' }}>
                 {invoice.delivery_no || '-'}
               </div>
-              <div className="p-1.5" style={{ width: '15.67%', borderRight: '1px solid #000000' }}>
+              <div className="p-1.5 text-[11pt]" style={{ width: '15.67%', borderRight: '1px solid #000000' }}>
                 Delivery Dt:
               </div>
-              <div className="p-1.5" style={{ width: '38.45%' }}>
+              <div className="p-1.5 text-[12pt]" style={{ width: '38.45%' }}>
                 {invoice.delivery_date ? formatDisplayDate(invoice.delivery_date) : '-'}
               </div>
             </div>
 
-            {/* Row 5: Despatched through: | value ; Destination: | value */}
+            {/* Row 5: Despatched through: (11pt bold) | value (12pt bold) ; Destination: (11pt bold) | value (12pt bold) */}
             <div className="flex font-bold" style={{ borderBottom: '1px solid #000000', minHeight: '66px', display: 'flex' }}>
-              <div className="p-1.5" style={{ width: '17.99%', borderRight: '1px solid #000000' }}>
+              <div className="p-1.5 text-[11pt]" style={{ width: '17.99%', borderRight: '1px solid #000000' }}>
                 Despatched through:
               </div>
-              <div className="p-1.5" style={{ width: '27.89%', borderRight: '1px solid #000000' }}>
+              <div className="p-1.5 text-[12pt]" style={{ width: '27.89%', borderRight: '1px solid #000000' }}>
                 {invoice.despatched_through || '-'}
               </div>
-              <div className="p-1.5" style={{ width: '15.67%', borderRight: '1px solid #000000' }}>
+              <div className="p-1.5 text-[11pt]" style={{ width: '15.67%', borderRight: '1px solid #000000' }}>
                 Destination:
               </div>
-              <div className="p-1.5" style={{ width: '38.45%' }}>
+              <div className="p-1.5 text-[12pt]" style={{ width: '38.45%' }}>
                 {invoice.destination || '-'}
               </div>
             </div>
 
-            {/* Row 6: Terms of Delivery: (C:H merged, bold, centered, top-aligned) */}
-            <div className="p-1.5 text-center font-bold" style={{ minHeight: '76px' }}>
+            {/* Row 6: Terms of Delivery: (C:H merged, 11pt bold, centered, top-aligned) */}
+            <div className="p-1.5 text-center font-bold text-[11pt]" style={{ minHeight: '76px' }}>
               <div>Terms of Delivery:</div>
               {invoice.terms_of_delivery && (
-                <div className="font-normal text-[10pt] pt-1 whitespace-pre-line">
+                <div className="font-normal text-[11pt] pt-1 whitespace-pre-line">
                   {invoice.terms_of_delivery}
                 </div>
               )}
@@ -373,15 +373,15 @@ export function InvoicePage({
         </div>
 
         {/* 2. Line Items Table with Exact 8-Column Percentage Grid */}
-        <table className="w-full border-collapse" style={{ fontSize: '11pt', borderCollapse: 'collapse' }}>
+        <table className="w-full border-collapse" style={{ fontSize: '12pt', borderCollapse: 'collapse' }}>
           <thead>
             <tr
-              className="font-bold text-center"
+              className="font-bold text-center text-[11.5pt]"
               style={{
                 backgroundColor: '#ffffff',
                 color: '#000000',
                 borderBottom: '1px solid #000000',
-                height: '35px',
+                height: '36px',
               }}
             >
               <th style={{ width: '9.22%', borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>SI. No</th>
@@ -409,7 +409,7 @@ export function InvoicePage({
                   style={{
                     color: '#000000',
                     borderBottom: '1px solid #000000',
-                    minHeight: '27px',
+                    minHeight: '32px',
                   }}
                 >
                   <td className="py-1 px-1 text-center font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
@@ -440,9 +440,9 @@ export function InvoicePage({
               );
             })}
 
-            {/* Spacer Rows: Pad so bill has at least 5 boxed rows matching Excel */}
+            {/* Spacer Rows: Pad so bill has at least 5 boxed rows matching Excel (min 8mm / 32px each) */}
             {emptyRowCount > 0 && Array.from({ length: emptyRowCount }).map((_, rIdx) => (
-              <tr key={`empty-${rIdx}`} style={{ height: '27px', borderBottom: '1px solid #000000' }}>
+              <tr key={`empty-${rIdx}`} style={{ height: '32px', borderBottom: '1px solid #000000' }}>
                 <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
                 <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
                 <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
@@ -459,7 +459,7 @@ export function InvoicePage({
               <tr style={{ borderBottom: '1px solid #000000' }}>
                 <td
                   colSpan="8"
-                  className="py-4 text-center font-bold"
+                  className="py-4 text-center font-bold text-[11pt]"
                   style={{ color: '#000000', borderBottom: '1px solid #000000' }}
                 >
                   ... Continued on Next Page (Page {page.pageNumber + 1} of {page.totalPages}) ...
@@ -467,24 +467,24 @@ export function InvoicePage({
               </tr>
             )}
 
-            {/* Final Page: Clean CGST & SGST Rows immediately after items, all boxed */}
+            {/* Final Page: Clean CGST & SGST Rows (12pt, min 8mm) immediately after items, all boxed */}
             {isLast && rateGroups.map((group) => (
               <React.Fragment key={group.gstPercent}>
                 <tr
                   style={{
                     color: '#000000',
                     borderBottom: '1px solid #000000',
-                    height: '27px',
+                    height: '32px',
                   }}
                 >
                   <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
-                  <td className="py-1 px-2 text-left font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>CGST</td>
+                  <td className="py-1 px-2 text-left font-normal text-[12pt]" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>CGST</td>
                   <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
-                  <td className="py-1 px-1 text-right font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>{group.cgstRate}%</td>
+                  <td className="py-1 px-1 text-right font-normal text-[12pt]" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>{group.cgstRate}%</td>
                   <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
                   <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
                   <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
-                  <td className="py-1 px-2 text-right font-normal" style={{ borderBottom: '1px solid #000000' }}>
+                  <td className="py-1 px-2 text-right font-normal text-[12pt]" style={{ borderBottom: '1px solid #000000' }}>
                     {formatPlainAmount(group.cgstPaise)}
                   </td>
                 </tr>
@@ -492,24 +492,24 @@ export function InvoicePage({
                   style={{
                     color: '#000000',
                     borderBottom: '1px solid #000000',
-                    height: '27px',
+                    height: '32px',
                   }}
                 >
                   <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
-                  <td className="py-1 px-2 text-left font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>SGST</td>
+                  <td className="py-1 px-2 text-left font-normal text-[12pt]" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>SGST</td>
                   <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
-                  <td className="py-1 px-1 text-right font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>{group.sgstRate}%</td>
+                  <td className="py-1 px-1 text-right font-normal text-[12pt]" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>{group.sgstRate}%</td>
                   <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
                   <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
                   <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
-                  <td className="py-1 px-2 text-right font-normal" style={{ borderBottom: '1px solid #000000' }}>
+                  <td className="py-1 px-2 text-right font-normal text-[12pt]" style={{ borderBottom: '1px solid #000000' }}>
                     {formatPlainAmount(group.sgstPaise)}
                   </td>
                 </tr>
               </React.Fragment>
             ))}
 
-            {/* Final Page: Grand Total Row (A:B merged centered, C:H merged right-aligned) */}
+            {/* Final Page: Grand Total Row (A:B 12pt bold centered, C:H 14pt bold right-aligned) */}
             {isLast && (
               <tr
                 className="font-bold"
@@ -517,17 +517,17 @@ export function InvoicePage({
                   borderTop: '1px solid #000000',
                   borderBottom: '1px solid #000000',
                   color: '#000000',
-                  height: '27px',
+                  height: '32px',
                 }}
               >
                 <td
                   colSpan="2"
-                  className="py-1 px-2 text-center font-bold"
+                  className="py-1 px-2 text-center font-bold text-[12pt]"
                   style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}
                 >
                   Grand Total(round off)
                 </td>
-                <td colSpan="6" className="py-1 px-2 text-right font-bold" style={{ borderBottom: '1px solid #000000' }}>
+                <td colSpan="6" className="py-1 px-2 text-right font-bold text-[14pt]" style={{ borderBottom: '1px solid #000000' }}>
                   {formatPlainAmount(invoice.payable_paise)}
                 </td>
               </tr>
@@ -535,7 +535,7 @@ export function InvoicePage({
           </tbody>
         </table>
 
-        {/* 3. Amount in Words Row (Top and bottom borders only) */}
+        {/* 3. Amount in Words Row (A:B 11pt bold, C:H 11.5pt bold, top and bottom borders only) */}
         {isLast && (
           <div
             className="p-2 flex items-baseline text-[11pt]"
@@ -544,10 +544,10 @@ export function InvoicePage({
               borderBottom: '1px solid #000000',
             }}
           >
-            <div style={{ width: '32.39%' }} className="font-bold whitespace-nowrap">
+            <div style={{ width: '32.39%' }} className="font-bold text-[11pt] whitespace-nowrap">
               Amount in words:
             </div>
-            <div style={{ width: '67.61%' }} className="font-normal uppercase">
+            <div style={{ width: '67.61%' }} className="font-bold text-[11.5pt] uppercase leading-snug">
               {invoice.amount_in_words || (invoice.payable_paise != null ? numberToWordsIndian(invoice.payable_paise) : '')}
             </div>
           </div>
@@ -556,14 +556,14 @@ export function InvoicePage({
         {/* 4. HSN/SAC Summary Table with 2-level headers matching Excel */}
         {isLast && (
           <div>
-            <table className="w-full border-collapse" style={{ fontSize: '10.5pt', borderCollapse: 'collapse' }}>
+            <table className="w-full border-collapse" style={{ fontSize: '11pt', borderCollapse: 'collapse' }}>
               <thead>
                 <tr
-                  className="font-bold text-center"
+                  className="font-bold text-center text-[11pt]"
                   style={{
                     backgroundColor: '#ffffff',
                     color: '#000000',
-                    height: '31px',
+                    height: '32px',
                   }}
                 >
                   <th
@@ -592,11 +592,11 @@ export function InvoicePage({
                   </th>
                 </tr>
                 <tr
-                  className="font-bold text-center"
+                  className="font-bold text-center text-[11pt]"
                   style={{
                     backgroundColor: '#ffffff',
                     color: '#000000',
-                    height: '31px',
+                    height: '32px',
                   }}
                 >
                   <th style={{ width: '12.16%', borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
@@ -620,58 +620,58 @@ export function InvoicePage({
                     style={{
                       color: '#000000',
                       borderBottom: '1px solid #000000',
-                      height: '31px',
+                      height: '32px',
                     }}
                   >
-                    <td className="py-1 px-1 text-center font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
+                    <td className="py-1 px-1 text-center font-normal text-[11pt]" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
                       {row.hsn}
                     </td>
-                    <td className="py-1 px-2 text-right font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
+                    <td className="py-1 px-2 text-right font-normal text-[11pt]" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
                       {formatPlainAmount(row.taxablePaise)}
                     </td>
-                    <td className="py-1 px-1 text-center font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
+                    <td className="py-1 px-1 text-center font-normal text-[11pt]" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
                       {row.centralRate}%
                     </td>
-                    <td className="py-1 px-2 text-center font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
+                    <td className="py-1 px-2 text-center font-normal text-[11pt]" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
                       {formatPlainAmount(row.centralTaxPaise)}
                     </td>
-                    <td className="py-1 px-1 text-center font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
+                    <td className="py-1 px-1 text-center font-normal text-[11pt]" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
                       {row.stateRate}%
                     </td>
-                    <td className="py-1 px-2 text-center font-normal" style={{ borderBottom: '1px solid #000000' }}>
+                    <td className="py-1 px-2 text-center font-normal text-[11pt]" style={{ borderBottom: '1px solid #000000' }}>
                       {formatPlainAmount(row.stateTaxPaise)}
                     </td>
                   </tr>
                 ))}
 
-                {/* HSN Total Row */}
+                {/* HSN Total Row (11.5pt regular label, 11.5pt bold tax) */}
                 <tr
                   style={{
                     borderTop: '1px solid #000000',
                     borderBottom: '1px solid #000000',
                     color: '#000000',
-                    height: '31px',
+                    height: '32px',
                   }}
                 >
-                  <td colSpan="5" className="py-1 px-2 text-left font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
+                  <td colSpan="5" className="py-1 px-2 text-left font-normal text-[11.5pt]" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
                     Total(round off)
                   </td>
-                  <td className="py-1 px-2 text-center font-normal" style={{ borderBottom: '1px solid #000000' }}>
+                  <td className="py-1 px-2 text-center font-bold text-[11.5pt]" style={{ borderBottom: '1px solid #000000' }}>
                     {formatPlainAmount(hsnSummary?.totalTaxPaise)}
                   </td>
                 </tr>
               </tbody>
             </table>
 
-            {/* Amount in words for Tax (Top border only) */}
+            {/* Amount in words for Tax (Top border only, 11pt bold label, 11.5pt bold text) */}
             <div
-              className="p-2 flex items-baseline text-[10.5pt]"
+              className="p-2 flex items-baseline text-[11pt]"
               style={{ borderTop: '1px solid #000000' }}
             >
-              <div style={{ width: '32.39%' }} className="font-bold whitespace-nowrap">
+              <div style={{ width: '32.39%' }} className="font-bold text-[11pt] whitespace-nowrap">
                 Amount in words
               </div>
-              <div style={{ width: '67.61%' }} className="font-normal uppercase">
+              <div style={{ width: '67.61%' }} className="font-bold text-[11.5pt] uppercase leading-snug">
                 {hsnSummary?.taxInWords}
               </div>
             </div>
@@ -683,20 +683,20 @@ export function InvoicePage({
       {isLast && (
         <div className="pt-3 text-black">
           {/* Declaration: 10pt left */}
-          <div className="text-[10pt] leading-tight pb-3">
+          <div className="text-[10pt] leading-tight pb-3 font-normal">
             Declaration: {firm.declaration || DEFAULT_FIRM.declaration}
           </div>
 
-          {/* For Khansa Enterprises: right-aligned */}
-          <div className="text-right text-[11pt]">
+          {/* For Khansa Enterprises: right-aligned, 11pt regular */}
+          <div className="text-right text-[11pt] font-normal">
             For {firm.name || 'Khansa Enterprises'}
           </div>
 
           {/* ~16mm blank space for signing */}
           <div style={{ height: '60px' }}></div>
 
-          {/* Signatures */}
-          <div className="flex justify-between items-end text-[10.5pt] font-bold">
+          {/* Signatures: 11pt bold */}
+          <div className="flex justify-between items-end text-[11pt] font-bold">
             <div>Customers Seal and Signature</div>
             <div>Authorised Signature</div>
           </div>
