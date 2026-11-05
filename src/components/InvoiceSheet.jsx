@@ -4,6 +4,7 @@ import {
   getRateGroupSummary,
   getHsnSummaryRows,
   paginateInvoiceLines,
+  normalizeLinesWithFreight,
 } from '../lib/invoiceLayout.js';
 import { formatMilliToQuantity } from '../lib/billPayload.js';
 import { formatDisplayDate, numberToWordsIndian } from '../lib/billUtils.js';
@@ -123,15 +124,20 @@ export function InvoicePage({
   const firm = firmProfile || DEFAULT_FIRM;
   const isFirst = page?.isFirst ?? true;
   const isLast = page?.isLast ?? true;
-  const lines = page?.lines || invoice?.lines || [];
+  const rawLines = page?.lines || invoice?.lines || [];
+  const allLines = invoice?.lines || rawLines;
+  const invoiceFreight = invoice?.freight_paise || 0;
 
-  const rateGroups = isLast ? getRateGroupSummary(invoice?.lines || []) : [];
-  const hsnSummary = isLast ? getHsnSummaryRows(invoice?.lines || []) : null;
+  const normalizedPageLines = normalizeLinesWithFreight(rawLines, isFirst ? invoiceFreight : 0);
+  const normalizedAllLines = normalizeLinesWithFreight(allLines, invoiceFreight);
+
+  const rateGroups = isLast ? getRateGroupSummary(normalizedAllLines) : [];
+  const hsnSummary = isLast ? getHsnSummaryRows(normalizedAllLines) : null;
   const isCancelled = invoice?.status === 'cancelled';
 
   // Expand rows to include extra per-item freight rows if freight > 0
   const renderedItemRows = [];
-  (lines || []).forEach((line, idx) => {
+  (normalizedPageLines || []).forEach((line, idx) => {
     renderedItemRows.push({ type: 'item', line, index: idx });
     const freightPaise = Number(line.freight_paise || line.freightPaise || 0);
     if (freightPaise > 0) {
@@ -551,42 +557,18 @@ export function InvoicePage({
               </React.Fragment>
             ))}
 
-            {/* Freight row (only for legacy bill-level freight when no item has per-item freight) */}
-            {isLast && (() => {
-              const hasPerItemFreight = (invoice.lines || []).some((l) => Number(l.freight_paise || l.freightPaise || 0) > 0);
-              const billFreight = !hasPerItemFreight ? (Number(invoice.freight_paise) || 0) : 0;
-              if (billFreight <= 0) return null;
-              return (
-                <tr style={{ borderBottom: '1px solid #000000', height: '32px' }}>
-                  <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
-                  <td className="py-1 px-2 text-left font-normal text-[12pt]" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
-                    Freight Charges
-                  </td>
-                  <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
-                  <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
-                  <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
-                  <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
-                  <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
-                  <td className="py-1 px-2 text-right font-normal text-[12pt]" style={{ borderBottom: '1px solid #000000' }}>
-                    {formatPlainAmount(billFreight)}
-                  </td>
-                </tr>
-              );
-            })()}
 
             {/* Round Off row (+/- paise) */}
             {isLast && (() => {
-              const hasPerItemFreight = (invoice.lines || []).some((l) => Number(l.freight_paise || l.freightPaise || 0) > 0);
-              const billFreight = !hasPerItemFreight ? (Number(invoice.freight_paise) || 0) : 0;
               const totalTax = rateGroups.reduce((acc, g) => acc + (g.cgstPaise || 0) + (g.sgstPaise || 0), 0);
-              const lineTaxableSum = (invoice.lines || []).reduce((acc, l) => {
+              const lineTaxableSum = normalizedAllLines.reduce((acc, l) => {
                 const q = l.qty_milli || 0;
                 const r = l.rate_paise || 0;
                 const base = l.amount_paise != null ? Number(l.amount_paise) : Math.round((q * r) / 1000);
                 const fr = Number(l.freight_paise || l.freightPaise || 0);
                 return acc + base + fr;
               }, 0);
-              const subtotalBeforeRound = lineTaxableSum + totalTax + billFreight;
+              const subtotalBeforeRound = lineTaxableSum + totalTax;
               const ro = invoice.round_off_paise != null
                 ? Number(invoice.round_off_paise)
                 : (invoice.payable_paise != null ? (Number(invoice.payable_paise) - subtotalBeforeRound) : 0);

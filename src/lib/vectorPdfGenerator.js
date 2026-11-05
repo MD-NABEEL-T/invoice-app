@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 import { registerCarlitoFont } from './fonts/carlito.js';
 import { formatDisplayDate } from './billUtils.js';
 import { formatMilliToQuantity, numberToWordsIndian } from './billPayload.js';
-import { getHsnSummaryRows, getRateGroupSummary, formatPlainAmount, paginateInvoiceLines } from './invoiceLayout.js';
+import { getHsnSummaryRows, getRateGroupSummary, formatPlainAmount, paginateInvoiceLines, normalizeLinesWithFreight } from './invoiceLayout.js';
 
 const DEFAULT_FIRM = {
   name: 'KHANSA ENTERPRISES',
@@ -146,7 +146,8 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
   doc.setTextColor(0, 0, 0);
   doc.setLineWidth(0.176); // 0.5 pt
 
-  const lines = invoice?.lines || [];
+  const rawLines = invoice?.lines || [];
+  const lines = normalizeLinesWithFreight(rawLines, invoice?.freight_paise || 0);
   const rateGroups = getRateGroupSummary(lines);
   const hsnSummary = getHsnSummaryRows(lines);
 
@@ -634,26 +635,16 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
       y += taxRowH;
     });
 
-    // Freight row (only for legacy bill-level freight when no item has per-item freight)
-    const hasPerItemFreight = (invoice.lines || []).some((l) => Number(l.freight_paise || l.freightPaise || 0) > 0);
-    const billFreightPaise = !hasPerItemFreight ? (Number(invoice.freight_paise) || 0) : 0;
-    if (billFreightPaise > 0) {
-      for (let c = 0; c < 8; c++) drawBox(doc, COL_X[c], y, COL_WIDTHS[c], taxRowH);
-      drawCell(doc, 'Freight Charges', COL_X[1], y, COL_WIDTHS[1], taxRowH, { fontSize: 12, fontStyle: 'normal', align: 'left', valign: 'middle', fontName, padding: 1.2 });
-      drawCell(doc, formatPlainAmount(billFreightPaise), COL_X[7], y, COL_WIDTHS[7], taxRowH, { fontSize: 12, fontStyle: 'normal', align: 'right', valign: 'middle', fontName, padding: 1.2 });
-      y += taxRowH;
-    }
-
     // Round Off row (+/- paise so numbers add up)
     const totalTaxPaise = rateGroups.reduce((acc, g) => acc + (g.cgstPaise || 0) + (g.sgstPaise || 0), 0);
-    const lineTaxableSum = (invoice.lines || []).reduce((acc, l) => {
+    const lineTaxableSum = lines.reduce((acc, l) => {
       const q = l.qty_milli || 0;
       const r = l.rate_paise || 0;
       const base = l.amount_paise != null ? Number(l.amount_paise) : Math.round((q * r) / 1000);
       const fr = Number(l.freight_paise || l.freightPaise || 0);
       return acc + base + fr;
     }, 0);
-    const subtotalBeforeRound = lineTaxableSum + totalTaxPaise + billFreightPaise;
+    const subtotalBeforeRound = lineTaxableSum + totalTaxPaise;
     const roundOffPaise = invoice.round_off_paise != null
       ? Number(invoice.round_off_paise)
       : (invoice.payable_paise != null ? (Number(invoice.payable_paise) - subtotalBeforeRound) : 0);

@@ -5,7 +5,7 @@ import { formatRupees, formatDisplayDate } from '../lib/billUtils.js';
 import { calcInvoice } from '../lib/tax.js';
 import { numberToWordsIndian, formatMilliToQuantity } from '../lib/billPayload.js';
 import InvoiceSheet, { InvoicePage } from '../components/InvoiceSheet.jsx';
-import { getInvoicePdfFilename, getCopyLabel, paginateInvoiceLines } from '../lib/invoiceLayout.js';
+import { getInvoicePdfFilename, getCopyLabel, paginateInvoiceLines, normalizeLinesWithFreight } from '../lib/invoiceLayout.js';
 import { generateInvoicePdfBlob, downloadInvoicePdf, shareInvoicePdf } from '../lib/pdfGenerator.js';
 
 export default function BillView() {
@@ -125,7 +125,8 @@ export default function BillView() {
   // Rate-group calculation for breakdown display
   const rateGroups = useMemo(() => {
     if (!invoice?.lines || invoice.lines.length === 0) return [];
-    const formatted = invoice.lines.map((l) => ({
+    const normalized = normalizeLinesWithFreight(invoice.lines, invoice.freight_paise || 0);
+    const formatted = normalized.map((l) => ({
       qtyMilli: Number(l.qty_milli || 0),
       ratePaise: Number(l.rate_paise || 0),
       gstPercent: Number(l.gst_percent || 0),
@@ -138,8 +139,9 @@ export default function BillView() {
   // Paginated pages for print/PDF
   const paginatedPages = useMemo(() => {
     if (!invoice?.lines) return [];
-    return paginateInvoiceLines(invoice.lines);
-  }, [invoice?.lines]);
+    const normalized = normalizeLinesWithFreight(invoice.lines, invoice.freight_paise || 0);
+    return paginateInvoiceLines(normalized);
+  }, [invoice?.lines, invoice?.freight_paise]);
 
   // Action (a): Browser Print
   const handlePrint = () => {

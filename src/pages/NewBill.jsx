@@ -1004,15 +1004,25 @@ export default function NewBill() {
             if (retryErr) throw retryErr;
           }
         } else {
-          // Ensure freight, round off, and exact payable_paise are persisted even if DB RPC was an older version
+          // Ensure exact client-calculated tax and totals are persisted
           const extraUpdate = {
+            taxable_paise: payload.taxable_paise,
+            cgst_paise: payload.cgst_paise,
+            sgst_paise: payload.sgst_paise,
             payable_paise: payload.payable_paise,
             freight_paise: payload.freight_paise || 0,
             round_off_paise: payload.round_off_paise || 0,
           };
-          const { error: extraErr } = await supabase.from('invoices').update(extraUpdate).eq('id', editBillId);
-          if (extraErr) {
-            await supabase.from('invoices').update({ payable_paise: payload.payable_paise }).eq('id', editBillId);
+          await supabase.from('invoices').update(extraUpdate).eq('id', editBillId);
+
+          // Ensure each line item freight_paise is strictly persisted
+          for (let idx = 0; idx < payload.lines.length; idx++) {
+            const line = payload.lines[idx];
+            await supabase
+              .from('invoice_lines')
+              .update({ freight_paise: line.freight_paise || 0 })
+              .eq('invoice_id', editBillId)
+              .eq('line_no', idx + 1);
           }
         }
 

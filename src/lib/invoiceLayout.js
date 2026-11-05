@@ -36,15 +36,36 @@ export function formatPlainAmount(paise, { withPrefix = false } = {}) {
 }
 
 /**
+ * Ensures any invoice freight is automatically attached to the first item
+ * if no item explicitly specifies freight.
+ */
+export function normalizeLinesWithFreight(lines = [], invoiceFreightPaise = 0) {
+  if (!Array.isArray(lines) || lines.length === 0) return [];
+  const hasExplicitFreight = lines.some((l) => Number(l.freight_paise || l.freightPaise || 0) > 0);
+  const fallbackFreight = !hasExplicitFreight ? Number(invoiceFreightPaise || 0) : 0;
+
+  return lines.map((line, idx) => {
+    const existingFreight = Number(line.freight_paise ?? line.freightPaise ?? 0);
+    const assignedFreight = existingFreight > 0 ? existingFreight : (idx === 0 ? fallbackFreight : 0);
+    return {
+      ...line,
+      freight_paise: assignedFreight,
+      freightPaise: assignedFreight,
+    };
+  });
+}
+
+/**
  * 3. Rate-group tax summary rows for bill lines.
  * Computes consolidated taxable amount and tax split (CGST + SGST) per GST % rate slab.
  */
-export function getRateGroupSummary(lines = []) {
-  if (!Array.isArray(lines) || lines.length === 0) return [];
+export function getRateGroupSummary(lines = [], invoiceFreightPaise = 0) {
+  const normalized = normalizeLinesWithFreight(lines, invoiceFreightPaise);
+  if (normalized.length === 0) return [];
 
   const groupMap = new Map();
 
-  for (const line of lines) {
+  for (const line of normalized) {
     const gstPercent = Number(line.gst_percent ?? line.gstPercent ?? 0);
     const amountPaise = Number(
       line.amount_paise !== undefined && line.amount_paise !== null
@@ -86,8 +107,9 @@ export function getRateGroupSummary(lines = []) {
  * Returns rows plus totals and tax in words.
  * Includes per-item freight in the item's HSN taxable value.
  */
-export function getHsnSummaryRows(lines = []) {
-  if (!Array.isArray(lines) || lines.length === 0) {
+export function getHsnSummaryRows(lines = [], invoiceFreightPaise = 0) {
+  const normalized = normalizeLinesWithFreight(lines, invoiceFreightPaise);
+  if (!Array.isArray(normalized) || normalized.length === 0) {
     return {
       rows: [],
       totalTaxablePaise: 0,
@@ -100,7 +122,7 @@ export function getHsnSummaryRows(lines = []) {
 
   const hsnMap = new Map();
 
-  for (const line of lines) {
+  for (const line of normalized) {
     const hsn = String(line.hsn || '').trim() || 'OTHER';
     const gstPercent = Number(line.gst_percent ?? line.gstPercent ?? 0);
     const amountPaise = Number(

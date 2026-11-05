@@ -177,11 +177,17 @@ export function buildInvoicePayload({ header = {}, lines = [], roundToRupee = fa
   });
 
   // Calculate live invoice totals
-  const freightPaise = header.freight_paise !== undefined
+  const rawFreightPaise = header.freight_paise !== undefined
     ? Number(header.freight_paise) || 0
     : parseRupeesToPaise(header.freight || header.freight_rupees || 0);
 
-  const invoiceCalc = calcInvoice(normalizedLines, { roundToRupee, interState: false, freightPaise });
+  const hasExplicitLineFreight = normalizedLines.some((l) => l.freightPaise > 0);
+  if (!hasExplicitLineFreight && rawFreightPaise > 0 && normalizedLines.length > 0) {
+    normalizedLines[0].freightPaise = rawFreightPaise;
+    normalizedLines[0].freight_paise = rawFreightPaise;
+  }
+
+  const invoiceCalc = calcInvoice(normalizedLines, { roundToRupee, interState: false, freightPaise: 0 });
 
   return {
     invoice_date: header.invoice_date,
