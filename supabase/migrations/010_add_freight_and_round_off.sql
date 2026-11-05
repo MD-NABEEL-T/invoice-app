@@ -8,8 +8,9 @@ ALTER TABLE public.invoices ALTER COLUMN buyer_order_no DROP NOT NULL;
 ALTER TABLE public.invoices ALTER COLUMN buyer_order_no SET DEFAULT '';
 
 -- 3. Update create_invoice RPC to support freight_paise, round_off_paise, and optional buyer_order_no
+DROP FUNCTION IF EXISTS public.create_invoice(jsonb);
 CREATE OR REPLACE FUNCTION public.create_invoice(payload jsonb)
-RETURNS public.invoices
+RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
@@ -223,11 +224,14 @@ BEGIN
         ROUND((COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::numeric * COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::numeric) / 1000.0)::bigint
     FROM jsonb_array_elements(v_lines) WITH ORDINALITY AS line_data(l, ordinality);
 
-    RETURN v_created_invoice;
+    RETURN to_jsonb(v_created_invoice);
 END;
 $$;
 
+GRANT EXECUTE ON FUNCTION public.create_invoice(jsonb) TO anon, authenticated;
+
 -- 4. Update update_invoice RPC to support freight_paise, round_off_paise, and optional buyer_order_no
+DROP FUNCTION IF EXISTS public.update_invoice(uuid, jsonb);
 CREATE OR REPLACE FUNCTION public.update_invoice(p_invoice_id uuid, payload jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
