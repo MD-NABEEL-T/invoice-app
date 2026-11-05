@@ -610,7 +610,13 @@ export default function NewBill() {
   const handleUpdateLine = (index, field, value) => {
     setLines((prev) => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
+      const cur = { ...updated[index], [field]: value };
+      if (field === 'quantity') {
+        cur.qty_milli = parseQuantityToMilli(value);
+      } else if (field === 'rate') {
+        cur.rate_paise = parseRupeesToPaise(value);
+      }
+      updated[index] = cur;
       return updated;
     });
   };
@@ -956,23 +962,30 @@ export default function NewBill() {
           }
 
           await supabase.from('invoice_lines').delete().eq('invoice_id', editBillId);
-          const lineInserts = lines.map((l, idx) => {
-            const qtyMilli = l.qty_milli || parseQuantityToMilli(l.quantity);
-            const ratePaise = l.rate_paise !== undefined ? l.rate_paise : parseRupeesToPaise(l.rate);
-            return {
-              invoice_id: editBillId,
-              line_no: idx + 1,
-              description: l.description,
-              hsn: l.hsn,
-              unit: l.unit || 'PCS',
-              qty_milli: qtyMilli,
-              rate_paise: ratePaise,
-              gst_percent: Number(l.gst_percent),
-              amount_paise: Math.round((qtyMilli * ratePaise) / 1000),
-            };
-          });
+          const lineInserts = payload.lines.map((l, idx) => ({
+            invoice_id: editBillId,
+            line_no: idx + 1,
+            description: l.description,
+            hsn: l.hsn,
+            unit: l.unit || 'PCS',
+            qty_milli: l.qty_milli,
+            rate_paise: l.rate_paise,
+            gst_percent: Number(l.gst_percent),
+            amount_paise: l.amount_paise,
+          }));
           const { error: linesErr } = await supabase.from('invoice_lines').insert(lineInserts);
           if (linesErr) throw linesErr;
+        } else {
+          // Ensure freight, round off, and exact payable_paise are persisted even if DB RPC was an older version
+          const extraUpdate = {
+            payable_paise: payload.payable_paise,
+            freight_paise: payload.freight_paise || 0,
+            round_off_paise: payload.round_off_paise || 0,
+          };
+          const { error: extraErr } = await supabase.from('invoices').update(extraUpdate).eq('id', editBillId);
+          if (extraErr) {
+            await supabase.from('invoices').update({ payable_paise: payload.payable_paise }).eq('id', editBillId);
+          }
         }
 
         // Webhook dispatch on bill edit

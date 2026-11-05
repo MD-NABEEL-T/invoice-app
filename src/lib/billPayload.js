@@ -140,13 +140,17 @@ export function validateBillForm({ header = {}, lines = [] } = {}) {
 export function buildInvoicePayload({ header = {}, lines = [], roundToRupee = false } = {}) {
   // Normalize and parse lines
   const normalizedLines = lines.map((line, idx) => {
-    const qtyMilli = typeof line.qty_milli === 'number' && line.qty_milli > 0
-      ? line.qty_milli
-      : parseQuantityToMilli(line.quantity ?? line.qty ?? line.qty_milli);
+    const qtyMilli = line.quantity !== undefined && line.quantity !== null && String(line.quantity).trim() !== ''
+      ? parseQuantityToMilli(line.quantity)
+      : (typeof line.qty_milli === 'number' && line.qty_milli > 0
+          ? line.qty_milli
+          : parseQuantityToMilli(line.qty ?? line.qty_milli ?? 1));
 
-    const ratePaise = typeof line.rate_paise === 'number' && line.rate_paise >= 0
-      ? line.rate_paise
-      : parseRupeesToPaise(line.rate ?? line.rate_rupees ?? line.rate_paise);
+    const ratePaise = line.rate !== undefined && line.rate !== null && String(line.rate).trim() !== ''
+      ? parseRupeesToPaise(line.rate)
+      : (typeof line.rate_paise === 'number' && line.rate_paise >= 0
+          ? line.rate_paise
+          : parseRupeesToPaise(line.rate_rupees ?? line.rate_paise ?? 0));
 
     const gstPercent = Number(line.gst_percent ?? line.gstPercent ?? 0);
 

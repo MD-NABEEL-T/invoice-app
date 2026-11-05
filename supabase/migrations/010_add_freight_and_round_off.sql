@@ -226,3 +226,143 @@ BEGIN
     RETURN v_created_invoice;
 END;
 $$;
+
+-- 4. Update update_invoice RPC to support freight_paise, round_off_paise, and optional buyer_order_no
+CREATE OR REPLACE FUNCTION public.update_invoice(p_invoice_id uuid, payload jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_existing public.invoices%ROWTYPE;
+    v_invoice_date date;
+    v_calc_taxable bigint := 0;
+    v_calc_cgst bigint := 0;
+    v_calc_sgst bigint := 0;
+    v_calc_payable bigint := 0;
+    v_freight_paise bigint := 0;
+    v_round_off_paise bigint := 0;
+    v_lines jsonb;
+BEGIN
+    SELECT * INTO v_existing
+    FROM public.invoices
+    WHERE id = p_invoice_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Invoice with ID % not found', p_invoice_id;
+    END IF;
+
+    IF v_existing.status = 'cancelled' THEN
+        RAISE EXCEPTION 'Cancelled invoice % cannot be edited', v_existing.invoice_no;
+    END IF;
+
+    v_invoice_date := (COALESCE(payload->>'invoice_date', payload->>'invoiceDate', v_existing.invoice_date::text))::date;
+    v_freight_paise := COALESCE((payload->>'freight_paise')::bigint, 0);
+    v_round_off_paise := COALESCE((payload->>'round_off_paise')::bigint, 0);
+    v_lines := payload->'lines';
+
+    IF v_lines IS NOT NULL AND jsonb_typeof(v_lines) = 'array' AND jsonb_array_length(v_lines) > 0 THEN
+        WITH parsed_lines AS (
+            SELECT
+                ROUND((COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::numeric * COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::numeric) / 1000.0)::bigint AS amount_paise,
+                COALESCE((l->>'gst_percent'), (l->>'gstPercent'))::numeric AS gst_percent
+            FROM jsonb_array_elements(v_lines) AS l
+        ),
+        rate_groups AS (
+            SELECT
+                gst_percent,
+                SUM(amount_paise)::bigint AS taxable_paise,
+                ROUND((SUM(amount_paise)::numeric * gst_percent) / 100.0)::bigint AS group_tax_paise,
+                FLOOR(ROUND((SUM(amount_paise)::numeric * gst_percent) / 100.0) / 2.0)::bigint AS cgst_paise,
+                (ROUND((SUM(amount_paise)::numeric * gst_percent) / 100.0)::bigint - FLOOR(ROUND((SUM(amount_paise)::numeric * gst_percent) / 100.0) / 2.0)::bigint) AS sgst_paise
+            FROM parsed_lines
+            GROUP BY gst_percent
+        )
+        SELECT
+            COALESCE(SUM(taxable_paise), 0)::bigint,
+            COALESCE(SUM(cgst_paise), 0)::bigint,
+            COALESCE(SUM(sgst_paise), 0)::bigint,
+            COALESCE(SUM(taxable_paise + group_tax_paise), 0)::bigint
+        INTO
+            v_calc_taxable,
+            v_calc_cgst,
+            v_calc_sgst,
+            v_calc_payable
+        FROM rate_groups;
+    ELSE
+        v_calc_taxable := v_existing.taxable_paise;
+        v_calc_cgst := v_existing.cgst_paise;
+        v_calc_sgst := v_existing.sgst_paise;
+        v_calc_payable := v_existing.payable_paise;
+    END IF;
+
+    -- Add freight and round-off to final payable
+    v_calc_payable := v_calc_payable + v_freight_paise + v_round_off_paise;
+
+    UPDATE public.invoices
+    SET
+        invoice_date = v_invoice_date,
+        buyer_id = NULLIF(COALESCE(payload->>'buyer_id', payload->>'buyerId'), '')::uuid,
+        buyer_name = COALESCE(payload->>'buyer_name', payload->>'buyerName', v_existing.buyer_name),
+        buyer_gstin = COALESCE(payload->>'buyer_gstin', payload->>'buyerGstin', v_existing.buyer_gstin),
+        buyer_state_code = COALESCE(payload->>'buyer_state_code', payload->>'buyerStateCode', v_existing.buyer_state_code),
+        buyer_address = COALESCE(payload->>'buyer_address', payload->>'buyerAddress', v_existing.buyer_address),
+        buyer_order_no = COALESCE(payload->>'buyer_order_no', payload->>'buyerOrderNo', v_existing.buyer_order_no),
+        buyer_order_date = COALESCE(payload->>'buyer_order_date', payload->>'buyerOrderDate', v_existing.buyer_order_date),
+        delivery_no = COALESCE(payload->>'delivery_no', payload->>'deliveryNo', v_existing.delivery_no),
+        delivery_date = NULLIF(COALESCE(payload->>'delivery_date', payload->>'deliveryDate'), '')::date,
+        despatched_through = COALESCE(payload->>'despatched_through', payload->>'despatchedThrough', v_existing.despatched_through),
+        destination = COALESCE(payload->>'destination', payload->>'destination', v_existing.destination),
+        terms_of_delivery = COALESCE(payload->>'terms_of_delivery', payload->>'termsOfDelivery', v_existing.terms_of_delivery),
+        taxable_paise = v_calc_taxable,
+        cgst_paise = v_calc_cgst,
+        sgst_paise = v_calc_sgst,
+        payable_paise = v_calc_payable,
+        freight_paise = v_freight_paise,
+        round_off_paise = v_round_off_paise
+    WHERE id = p_invoice_id;
+
+    IF v_lines IS NOT NULL AND jsonb_typeof(v_lines) = 'array' AND jsonb_array_length(v_lines) > 0 THEN
+        DELETE FROM public.invoice_lines WHERE invoice_id = p_invoice_id;
+
+        INSERT INTO public.invoice_lines (
+            invoice_id,
+            line_no,
+            description,
+            hsn,
+            unit,
+            qty_milli,
+            rate_paise,
+            gst_percent,
+            amount_paise
+        )
+        SELECT
+            p_invoice_id,
+            (line_data.ordinality)::int AS line_no,
+            btrim(COALESCE(l->>'description', 'Item')),
+            NULLIF(btrim(COALESCE(l->>'hsn', '')), ''),
+            COALESCE(l->>'unit', 'PCS'),
+            COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::bigint,
+            COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::bigint,
+            COALESCE((l->>'gst_percent'), (l->>'gstPercent'))::numeric,
+            ROUND((COALESCE((l->>'qty_milli'), (l->>'qtyMilli'))::numeric * COALESCE((l->>'rate_paise'), (l->>'ratePaise'))::numeric) / 1000.0)::bigint
+        FROM jsonb_array_elements(v_lines) WITH ORDINALITY AS line_data(l, ordinality);
+    END IF;
+
+    RETURN jsonb_build_object(
+        'id', p_invoice_id,
+        'invoice_no', v_existing.invoice_no,
+        'taxable_paise', v_calc_taxable,
+        'cgst_paise', v_calc_cgst,
+        'sgst_paise', v_calc_sgst,
+        'payable_paise', v_calc_payable,
+        'freight_paise', v_freight_paise,
+        'round_off_paise', v_round_off_paise,
+        'status', v_existing.status
+    );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.update_invoice(uuid, jsonb) TO anon, authenticated;
+
