@@ -154,20 +154,14 @@ export default function BillView() {
     setGeneratingPdf(true);
     setPdfMessage('Rendering invoice pages to PDF...');
     try {
-      const container = document.getElementById('pdf-download-container') || document.getElementById('print-container');
-      if (!container) throw new Error('PDF container not available in DOM');
-
-      const pageElements = container.querySelectorAll('.invoice-page');
-      if (pageElements.length === 0) throw new Error('No invoice pages found to render');
-
       const filename = getInvoicePdfFilename(invoice.invoice_no);
 
-      const { blob, sizeBytes, sizeKb } = await generateInvoicePdfBlob(pageElements, {
-        scale: 2,
-        jpegQuality: 0.85,
-      });
+      const { blob, sizeBytes, sizeKb, doc } = await generateInvoicePdfBlob(invoice, {
+        copyLabel: getCopyLabel(0, labelCopiesEnabled),
+      }, invoice, firmProfile);
 
-      setPdfMeasurement({ sizeBytes, sizeKb, pagesCount: pageElements.length });
+      const pageCount = doc?.getNumberOfPages?.() || 1;
+      setPdfMeasurement({ sizeBytes, sizeKb, pagesCount: pageCount });
 
       if (actionType === 'share') {
         const shareResult = await shareInvoicePdf(blob, filename, {

@@ -14,6 +14,7 @@ import {
 import { formatRupees, formatDisplayDate } from '../lib/billUtils.js';
 import { validateHSN } from '../lib/itemValidation.js';
 import { COMMON_HSN_CODES } from '../lib/hsnCodes.js';
+import { buildVectorInvoicePdf } from '../lib/vectorPdfGenerator.js';
 
 const DRAFT_STORAGE_KEY = 'draft_new_bill';
 
@@ -772,6 +773,44 @@ export default function NewBill() {
         }
 
         const emailTo = localStorage.getItem('khansa_notification_email') || 'khansaenterprises19@gmail.com';
+
+        let pdfBase64 = '';
+        try {
+          const invoiceObj = {
+            invoice_no: invoiceNo,
+            invoice_date: header.invoice_date,
+            buyer_name: header.buyer_name,
+            buyer_address: header.buyer_address,
+            buyer_gstin: header.buyer_gstin || '',
+            buyer_order_no: header.buyer_order_no,
+            buyer_order_date: header.buyer_order_date,
+            delivery_no: header.delivery_no,
+            delivery_date: header.delivery_date,
+            despatched_through: header.despatched_through,
+            destination: header.destination,
+            terms_of_delivery: header.terms_of_delivery,
+            lines: lines.map((l, idx) => ({
+              line_no: idx + 1,
+              description: l.description,
+              hsn: l.hsn,
+              qty_milli: parseQuantityToMilli(l.quantity),
+              rate_paise: parseRupeesToPaise(l.rate),
+              unit: l.unit,
+              gst_percent: l.gst_percent,
+            })),
+            taxable_paise: payload.taxable_paise,
+            cgst_paise: payload.cgst_paise,
+            sgst_paise: payload.sgst_paise,
+            payable_paise: payload.payable_paise,
+            amount_in_words: numberToWordsIndian(payload.payable_paise),
+          };
+          const doc = buildVectorInvoicePdf(invoiceObj, null);
+          const dataUri = doc.output('datauristring');
+          pdfBase64 = dataUri.split(',')[1] || '';
+        } catch (pdfErr) {
+          console.warn('Failed to build vector PDF for webhook:', pdfErr);
+        }
+
         const emailPayload = {
           action: isEdit ? 'Bill Edited' : 'New Bill Created',
           invoice_no: invoiceNo,
@@ -797,6 +836,7 @@ export default function NewBill() {
           cgst_rupees: (payload.cgst_paise / 100).toFixed(2),
           sgst_rupees: (payload.sgst_paise / 100).toFixed(2),
           payable_rupees: (payload.payable_paise / 100).toFixed(2),
+          pdf_base64: pdfBase64,
           lines: lines.map((l) => {
             const qtyMilli = parseQuantityToMilli(l.quantity);
             const ratePaise = parseRupeesToPaise(l.rate);
