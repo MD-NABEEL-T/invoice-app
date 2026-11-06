@@ -783,20 +783,23 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
     // ~15mm blank space for signing, then "Customers Seal and Signature" at left (11pt bold)
     // and "Authorised Signature" at right (11pt bold).
     // -------------------------------------------------------------
-    y += 2.5;
+    y += 2.0;
 
-    // Declaration: 11pt left
+    // Declaration: 10.5pt left
     doc.setFont(fontName, 'normal');
-    doc.setFontSize(11);
+    doc.setFontSize(10.5);
     const decText = `Declaration: ${firm.declaration || DEFAULT_FIRM.declaration}`;
-    doc.text(decText, COL_X[0], y + 3.2);
-    y += 7.0;
+    doc.text(decText, COL_X[0], y + 3.0);
+    y += 6.0;
 
     // "For Khansa Enterprises" (11.5pt bold, right-aligned)
     doc.setFont(fontName, 'bold');
     doc.setFontSize(11.5);
-    doc.text(`For ${firm.name || 'Khansa Enterprises'}`, COL_X[8], y + 3.2, { align: 'right' });
-    y += 16.0; // ~15mm blank space for signing
+    doc.text(`For ${firm.name || 'Khansa Enterprises'}`, COL_X[8], y + 3.0, { align: 'right' });
+
+    // Signing blank space: 10mm (clamped so signatures stay safely <= 278mm, leaving >= 19mm bottom margin)
+    const signGap = Math.min(11.0, Math.max(7.0, 278.0 - y - 6.0));
+    y += signGap;
 
     // Signatures (12pt bold)
     doc.setFont(fontName, 'bold');

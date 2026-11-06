@@ -106,13 +106,13 @@ body {
    ========================================================================== */
 @media print {
   @page {
-    size: 210mm 297mm;
-    margin: 6mm 8mm;
+    size: auto;
+    margin: 4mm 6mm;
   }
 
   html, body {
-    width: 210mm !important;
-    min-width: 210mm !important;
+    width: 100% !important;
+    min-width: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
@@ -130,9 +130,12 @@ body {
   .invoice-scale-wrapper,
   .invoice-scale-inner,
   .space-y-6 {
-    width: 210mm !important;
+    width: 100% !important;
     max-width: none !important;
-    min-width: 210mm !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
     margin: 0 !important;
     padding: 0 !important;
     border: none !important;
@@ -154,7 +157,7 @@ body {
     display: block !important;
     visibility: visible !important;
     position: static !important;
-    width: 210mm !important;
+    width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
   }
@@ -165,11 +168,11 @@ body {
 
   .invoice-page {
     width: 100% !important;
-    max-width: 194mm !important;
+    max-width: 198mm !important;
     min-width: 0 !important;
     height: auto !important;
     min-height: auto !important;
-    max-height: 285mm !important;
+    max-height: none !important;
     display: block !important;
     border: none !important;
     box-shadow: none !important;
@@ -177,6 +180,7 @@ body {
     break-after: page !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+    overflow: visible !important;
     margin: 0 auto !important;
     padding: 0 !important;
     box-sizing: border-box !important;

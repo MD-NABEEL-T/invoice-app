@@ -151,7 +151,7 @@ export function InvoicePage({
 
   return (
     <div
-      className="invoice-page box-border mx-auto relative overflow-hidden bg-white text-black"
+      className="invoice-page box-border mx-auto relative overflow-hidden bg-white text-black print:overflow-visible print:max-h-none print:h-auto"
       style={{
         width: '794px',
         maxWidth: '100%',
@@ -765,9 +765,9 @@ export function InvoicePage({
 
       {/* FOOTER (Strictly outside table box, NO borders) */}
       {isLast && (
-        <div className="pt-3 text-black">
-          {/* Declaration: 11pt left */}
-          <div className="text-[11pt] leading-tight pb-3 font-normal">
+        <div className="pt-2 text-black print:pt-1">
+          {/* Declaration: 10.5pt left */}
+          <div className="text-[10.5pt] leading-tight pb-1.5 font-normal">
             Declaration: {firm.declaration || DEFAULT_FIRM.declaration}
           </div>
 
@@ -776,11 +776,11 @@ export function InvoicePage({
             For {firm.name || 'Khansa Enterprises'}
           </div>
 
-          {/* ~16mm blank space for signing */}
-          <div style={{ height: '60px' }}></div>
+          {/* Blank space for signing (32px / ~8.5mm to comfortably stay within printer margins) */}
+          <div className="h-8 print:h-7"></div>
 
           {/* Signatures: 12pt bold */}
-          <div className="flex justify-between items-end text-[12pt] font-bold">
+          <div className="flex justify-between items-end text-[12pt] font-bold pb-1">
             <div>Customers Seal and Signature</div>
             <div>Authorised Signatory</div>
           </div>
