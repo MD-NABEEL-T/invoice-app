@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
 import { formatRupees, formatDisplayDate, computeBillStats } from '../lib/billUtils.js';
 import { financialYear, formatInvoiceNo } from '../lib/tax.js';
-import { getGstReminder, checkAndNotifyDailySales } from '../lib/gstReminders.js';
+import { getGstReminder } from '../lib/gstReminders.js';
 
 export default function Home() {
   const currentFy = financialYear(new Date());
@@ -80,13 +80,6 @@ export default function Home() {
   }, [loadData]);
 
   const stats = computeBillStats(invoices);
-
-  // Daily sales reminder notification check (fires once per day if 0 bills created today)
-  useEffect(() => {
-    if (!loading) {
-      checkAndNotifyDailySales(stats.todayCount);
-    }
-  }, [loading, stats.todayCount]);
 
   return (
     <div className="space-y-6">

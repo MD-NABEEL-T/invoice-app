@@ -28,6 +28,7 @@ self.addEventListener('push', (event) => {
     vibrate: [300, 150, 300, 150, 300],
     tag: 'khansa-daily-no-sales',
     renotify: true,
+    requireInteraction: true,
     data: {
       url: payload.url || '/new',
     },

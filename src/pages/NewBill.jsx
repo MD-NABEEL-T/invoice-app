@@ -291,7 +291,7 @@ export default function NewBill() {
         if (inv.delivery_date) setDeliveryDate(inv.delivery_date);
         if (inv.despatched_through) setDespatchedThrough(String(inv.despatched_through));
         if (inv.destination) setDestination(String(inv.destination));
-        if (inv.terms_of_delivery) setTermsOfDelivery(String(inv.terms_of_delivery));
+        setTermsOfDelivery(inv.terms_of_delivery ? String(inv.terms_of_delivery) : '');
         if (Array.isArray(inv.lines) && inv.lines.length > 0) {
           const sorted = [...inv.lines].sort((a, b) => (a.line_no || 0) - (b.line_no || 0));
           const hasAnyItemFreight = sorted.some((l) => Number(l.freight_paise || 0) > 0);
@@ -366,7 +366,7 @@ export default function NewBill() {
         if (inv.delivery_no !== null && inv.delivery_no !== undefined) setDeliveryNo(String(inv.delivery_no));
         if (inv.despatched_through) setDespatchedThrough(String(inv.despatched_through));
         if (inv.destination) setDestination(String(inv.destination));
-        if (inv.terms_of_delivery) setTermsOfDelivery(String(inv.terms_of_delivery));
+        setTermsOfDelivery(inv.terms_of_delivery ? String(inv.terms_of_delivery) : '');
         if (Array.isArray(inv.lines) && inv.lines.length > 0) {
           const sorted = [...inv.lines].sort((a, b) => (a.line_no || 0) - (b.line_no || 0));
           const hasAnyItemFreight = sorted.some((l) => Number(l.freight_paise || 0) > 0);
@@ -1014,6 +1014,7 @@ export default function NewBill() {
         } else {
           // Ensure exact client-calculated tax and totals are persisted
           const extraUpdate = {
+            terms_of_delivery: header.terms_of_delivery || null,
             taxable_paise: payload.taxable_paise,
             cgst_paise: payload.cgst_paise,
             sgst_paise: payload.sgst_paise,
@@ -1554,6 +1555,20 @@ export default function NewBill() {
             value={destination}
             onChange={(e) => setDestination(e.target.value)}
             placeholder="e.g. Melvisharam / Chennai"
+            className="w-full min-h-[50px] px-4 py-3 rounded-2xl border-2 border-slate-400 text-slate-900 text-base font-bold"
+          />
+        </div>
+
+        {/* Terms of Delivery (Optional) */}
+        <div>
+          <label className="block text-base font-bold text-slate-900 mb-1">
+            Terms of Delivery (Optional)
+          </label>
+          <input
+            type="text"
+            value={termsOfDelivery}
+            onChange={(e) => setTermsOfDelivery(e.target.value)}
+            placeholder="e.g. Immediate / Payment on Delivery / Ex-Works"
             className="w-full min-h-[50px] px-4 py-3 rounded-2xl border-2 border-slate-400 text-slate-900 text-base font-bold"
           />
         </div>

@@ -115,7 +115,10 @@ async function runDailySalesCheck() {
         };
 
         try {
-          await webpush.sendNotification(pushSubscription, notificationPayload);
+          await webpush.sendNotification(pushSubscription, notificationPayload, {
+            TTL: 86400,
+            urgency: 'high',
+          });
           pushSuccessCount++;
           console.log(`[Daily 10 PM Check] ✓ Push delivered successfully to endpoint: ${sub.endpoint.slice(0, 45)}...`);
         } catch (pushErr) {

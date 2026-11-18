@@ -33,6 +33,11 @@ jobs:
           GSHEET_WEBHOOK_URL: ${{ secrets.GSHEET_WEBHOOK_URL || 'https://script.google.com/macros/s/AKfycbwJaT3E_wJbsFgkvBUtc3sH2Lz_kEk3I3fJZNChOaXa46GqGLaNJIXrMn8HaJTSzioJ/exec' }}
         run: node scripts/daily-sales-check.mjs
 
+      - name: Ping Vercel Daily Sales Check Endpoint
+        run: |
+          echo "Pinging Vercel daily-sales-check endpoint..."
+          curl -s -f -m 15 "https://khansa-invoices.vercel.app/api/daily-sales-check" || true
+
       - name: Fallback Direct Keep-Alive Ping
         run: |
           echo "Pinging Supabase counters..."

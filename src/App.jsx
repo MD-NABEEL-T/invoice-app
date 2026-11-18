@@ -17,6 +17,7 @@ import NumberingSettings from './pages/NumberingSettings.jsx';
 import PwaUpdateBanner from './components/PwaUpdateBanner.jsx';
 import { initKeepAlive } from './lib/keepAlive.js';
 import { checkAndNotifyGstReminders } from './lib/gstReminders.js';
+import { subscribeToPushNotifications } from './lib/pushSubscription.js';
 
 // Dev-only route for fixture and print layout testing (excluded in production build)
 const DevPrintSample = import.meta.env.DEV
@@ -29,6 +30,10 @@ export default function App() {
     initKeepAlive();
     // 2. GST Reminders: check for 8th & 19th monthly reminders
     checkAndNotifyGstReminders();
+    // 3. Keep background Web Push subscription active and synced with Supabase
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      subscribeToPushNotifications().catch(() => {});
+    }
   }, []);
 
   return (
