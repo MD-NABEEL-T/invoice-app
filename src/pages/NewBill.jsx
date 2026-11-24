@@ -461,14 +461,12 @@ export default function NewBill() {
             return prev;
           }
           if (validBranches.length > 0) {
-            // For a new bill, default to the Leather Goods Division (LGD) branch used on the most recent bill:
-            // "Unit-III (Melvisharam)" (id: 2ad13c40-9954-4132-898c-13f45fc7d2ad)
+            // For a new bill, default to the branch literally named "LGD" when buyer is KH EXPORT
             if (!editBillId && !copyFromId) {
               const preferredBranch =
-                validBranches.find((b) => b.id === '2ad13c40-9954-4132-898c-13f45fc7d2ad') ||
-                validBranches.find((b) => b.label && b.label.includes('Unit-III (Melvisharam)')) ||
-                validBranches.find((b) => b.label && b.label.toUpperCase() === 'LGD') ||
-                validBranches.find((b) => b.address && b.address.toUpperCase().includes('LEATHER GOODS DIVISION UNIT-III'));
+                validBranches.find((b) => b.label && b.label.trim().toUpperCase() === 'LGD') ||
+                validBranches.find((b) => b.name && b.name.trim().toUpperCase() === 'LGD') ||
+                validBranches.find((b) => b.label && b.label.toUpperCase().includes('LGD'));
               if (preferredBranch) {
                 setChosenAddress(preferredBranch.address);
                 return preferredBranch.id;
@@ -1641,32 +1639,28 @@ export default function NewBill() {
 
         {/* Terms of Delivery (Optional) */}
         <div>
-          <div className="flex items-center justify-between mb-1">
-            <label htmlFor="termsOfDelivery" className="block text-base font-bold text-slate-900">
-              Terms of Delivery (Optional)
-            </label>
-            {branches && branches.length > 0 && (
-              <select
-                id="termsBranchDropdown"
-                name="termsBranchDropdown"
-                className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-300 rounded-lg px-2 py-1 cursor-pointer"
-                onChange={(e) => {
-                  if (e.target.value) {
-                    setTermsOfDelivery(e.target.value);
-                    e.target.value = '';
-                  }
-                }}
-                defaultValue=""
-              >
-                <option value="" disabled>-- Fill from Delivery Unit --</option>
-                {branches.map((b) => (
-                  <option key={b.id} value={b.label || b.name || b.address}>
-                    {b.label || b.name || 'Branch'}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
+          <label htmlFor="termsOfDelivery" className="block text-base font-bold text-slate-900 mb-1">
+            Terms of Delivery (Optional)
+          </label>
+          <select
+            id="termsBranchDropdown"
+            name="termsBranchDropdown"
+            className="w-full min-h-[50px] px-4 py-3 rounded-2xl border-2 border-slate-400 bg-white text-slate-900 text-base font-bold mb-2"
+            onChange={(e) => {
+              if (e.target.value) {
+                setTermsOfDelivery(e.target.value);
+                e.target.value = '';
+              }
+            }}
+            defaultValue=""
+          >
+            <option value="">Quick pick: delivery unit</option>
+            {branches.map((b) => (
+              <option key={b.id} value={b.label || b.name || b.address}>
+                {b.label || b.name || 'Branch'}
+              </option>
+            ))}
+          </select>
           <input
             type="text"
             id="termsOfDelivery"
