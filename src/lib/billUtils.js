@@ -16,10 +16,16 @@ export function formatDisplayDate(dateInput) {
     return `${day}/${month}/${year}`;
   }
   const str = String(dateInput).trim();
+  if (str.includes(',')) {
+    return str.split(',').map((part) => formatDisplayDate(part.trim())).join(', ');
+  }
   const parts = str.split('T')[0].split('-');
   if (parts.length !== 3) return str;
   const [year, month, day] = parts;
-  return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+  if (year.length === 4 && month.length <= 2 && day.length <= 2) {
+    return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+  }
+  return str;
 }
 
 /**

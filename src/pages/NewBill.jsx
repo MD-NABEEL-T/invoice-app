@@ -59,7 +59,7 @@ export default function NewBill() {
   const [buyerOrderNo, setBuyerOrderNo] = useState('');
   const [buyerOrderDate, setBuyerOrderDate] = useState('');
   const [deliveryNo, setDeliveryNo] = useState('');
-  const [deliveryDate, setDeliveryDate] = useState(getTodayLocalDate);
+  const [deliveryDate, setDeliveryDate] = useState(() => formatDisplayDate(getTodayLocalDate()));
   const [despatchedThrough, setDespatchedThrough] = useState('');
   const [destination, setDestination] = useState('');
   const [termsOfDelivery, setTermsOfDelivery] = useState('');
@@ -288,9 +288,9 @@ export default function NewBill() {
         if (inv.buyer_order_no !== null && inv.buyer_order_no !== undefined) setBuyerOrderNo(String(inv.buyer_order_no).toUpperCase());
         if (inv.buyer_order_date) setBuyerOrderDate(inv.buyer_order_date);
         if (inv.delivery_no !== null && inv.delivery_no !== undefined) setDeliveryNo(String(inv.delivery_no));
-        if (inv.delivery_date) setDeliveryDate(inv.delivery_date);
+        setDeliveryDate(inv.delivery_date ? formatDisplayDate(inv.delivery_date) : '');
         if (inv.despatched_through) setDespatchedThrough(String(inv.despatched_through));
-        if (inv.destination) setDestination(String(inv.destination));
+        setDestination(inv.destination ? String(inv.destination) : '');
         setTermsOfDelivery(inv.terms_of_delivery ? String(inv.terms_of_delivery) : '');
         if (Array.isArray(inv.lines) && inv.lines.length > 0) {
           const sorted = [...inv.lines].sort((a, b) => (a.line_no || 0) - (b.line_no || 0));
@@ -364,8 +364,9 @@ export default function NewBill() {
         if (inv.buyer_order_no !== null && inv.buyer_order_no !== undefined) setBuyerOrderNo(String(inv.buyer_order_no).toUpperCase());
         if (inv.buyer_order_date) setBuyerOrderDate(inv.buyer_order_date);
         if (inv.delivery_no !== null && inv.delivery_no !== undefined) setDeliveryNo(String(inv.delivery_no));
+        setDeliveryDate(inv.delivery_date ? formatDisplayDate(inv.delivery_date) : formatDisplayDate(getTodayLocalDate()));
         if (inv.despatched_through) setDespatchedThrough(String(inv.despatched_through));
-        if (inv.destination) setDestination(String(inv.destination));
+        setDestination(inv.destination ? String(inv.destination) : '');
         setTermsOfDelivery(inv.terms_of_delivery ? String(inv.terms_of_delivery) : '');
         if (Array.isArray(inv.lines) && inv.lines.length > 0) {
           const sorted = [...inv.lines].sort((a, b) => (a.line_no || 0) - (b.line_no || 0));
@@ -474,7 +475,9 @@ export default function NewBill() {
   const handleBillDateChange = (newDate) => {
     setBillDate(newDate);
     // If delivery date was not customized, keep in sync with bill date
-    setDeliveryDate(newDate);
+    if (!deliveryDate || deliveryDate === formatDisplayDate(billDate) || deliveryDate === billDate) {
+      setDeliveryDate(formatDisplayDate(newDate));
+    }
   };
 
   // ===========================================================================
@@ -532,7 +535,7 @@ export default function NewBill() {
       setBuyerOrderNo('');
       setBuyerOrderDate('');
       setDeliveryNo('');
-      setDeliveryDate(getTodayLocalDate());
+      setDeliveryDate(formatDisplayDate(getTodayLocalDate()));
       setDestination('');
       setTermsOfDelivery('');
       setLines([]);
@@ -1012,9 +1015,16 @@ export default function NewBill() {
             if (retryErr) throw retryErr;
           }
         } else {
-          // Ensure exact client-calculated tax and totals are persisted
+          // Ensure exact client-calculated tax and totals are persisted,
+          // and ensure destination/terms_of_delivery are explicitly synced (so empty destination is cleared)
           const extraUpdate = {
+            destination: header.destination || null,
             terms_of_delivery: header.terms_of_delivery || null,
+            delivery_date: header.delivery_date || null,
+            delivery_no: header.delivery_no || null,
+            buyer_order_no: header.buyer_order_no || null,
+            buyer_order_date: header.buyer_order_date || null,
+            despatched_through: header.despatched_through || '',
             taxable_paise: payload.taxable_paise,
             cgst_paise: payload.cgst_paise,
             sgst_paise: payload.sgst_paise,
@@ -1022,7 +1032,12 @@ export default function NewBill() {
             freight_paise: payload.freight_paise || 0,
             round_off_paise: payload.round_off_paise || 0,
           };
-          await supabase.from('invoices').update(extraUpdate).eq('id', editBillId);
+          let { error: updateErr } = await supabase.from('invoices').update(extraUpdate).eq('id', editBillId);
+          if (updateErr && updateErr.code === '22007') {
+            const safeUpdate = { ...extraUpdate };
+            delete safeUpdate.delivery_date;
+            await supabase.from('invoices').update(safeUpdate).eq('id', editBillId);
+          }
 
           // Ensure each line item freight_paise is strictly persisted
           for (let idx = 0; idx < payload.lines.length; idx++) {
@@ -1050,8 +1065,16 @@ export default function NewBill() {
       const { data, error } = await supabase.rpc('create_invoice', { payload });
 
       if (!error && data?.id) {
-        // Guarantee line items freight_paise and totals are strictly persisted
+        // Guarantee line items freight_paise and totals are strictly persisted,
+        // and ensure destination/terms_of_delivery are explicitly synced
         const extraUpdate = {
+          destination: header.destination || null,
+          terms_of_delivery: header.terms_of_delivery || null,
+          delivery_date: header.delivery_date || null,
+          delivery_no: header.delivery_no || null,
+          buyer_order_no: header.buyer_order_no || null,
+          buyer_order_date: header.buyer_order_date || null,
+          despatched_through: header.despatched_through || '',
           taxable_paise: payload.taxable_paise,
           cgst_paise: payload.cgst_paise,
           sgst_paise: payload.sgst_paise,
@@ -1059,7 +1082,12 @@ export default function NewBill() {
           freight_paise: payload.freight_paise || 0,
           round_off_paise: payload.round_off_paise || 0,
         };
-        await supabase.from('invoices').update(extraUpdate).eq('id', data.id);
+        let { error: createExtraErr } = await supabase.from('invoices').update(extraUpdate).eq('id', data.id);
+        if (createExtraErr && createExtraErr.code === '22007') {
+          const safeUpdate = { ...extraUpdate };
+          delete safeUpdate.delivery_date;
+          await supabase.from('invoices').update(safeUpdate).eq('id', data.id);
+        }
 
         for (let idx = 0; idx < payload.lines.length; idx++) {
           const line = payload.lines[idx];
@@ -1482,6 +1510,8 @@ export default function NewBill() {
             </label>
             <input
               type="text"
+              name="buyerOrderNo"
+              autoComplete="off"
               value={buyerOrderNo}
               onChange={(e) => setBuyerOrderNo(e.target.value.toUpperCase())}
               placeholder="e.g. PO-1046 or leave blank"
@@ -1495,6 +1525,8 @@ export default function NewBill() {
             </label>
             <input
               type="text"
+              name="buyerOrderDate"
+              autoComplete="off"
               value={buyerOrderDate}
               onChange={(e) => setBuyerOrderDate(e.target.value)}
               placeholder="e.g. 10/04/2026 or multiple dates"
@@ -1511,6 +1543,8 @@ export default function NewBill() {
             </label>
             <input
               type="text"
+              name="deliveryNo"
+              autoComplete="off"
               value={deliveryNo}
               onChange={(e) => setDeliveryNo(e.target.value)}
               placeholder="e.g. 0000 or leave blank"
@@ -1520,13 +1554,16 @@ export default function NewBill() {
 
           <div>
             <label className="block text-base font-bold text-slate-900 mb-1">
-              Delivery Date
+              Delivery Date (Free text)
             </label>
             <input
-              type="date"
+              type="text"
+              name="deliveryDate"
+              autoComplete="off"
               value={deliveryDate}
               onChange={(e) => setDeliveryDate(e.target.value)}
-              className="w-full min-h-[50px] px-4 py-3 rounded-2xl border-2 border-slate-400 bg-white text-slate-900 text-base font-bold"
+              placeholder="e.g. 18/11/2026 or 18/11/2026, 20/11/2026"
+              className="w-full min-h-[50px] px-4 py-3 rounded-2xl border-2 border-slate-400 text-slate-900 text-base font-bold"
             />
           </div>
         </div>
@@ -1538,6 +1575,8 @@ export default function NewBill() {
           </label>
           <input
             type="text"
+            name="despatchedThrough"
+            autoComplete="off"
             value={despatchedThrough}
             onChange={(e) => setDespatchedThrough(e.target.value)}
             placeholder="e.g. Direct Delivery / Tempo"
@@ -1552,9 +1591,11 @@ export default function NewBill() {
           </label>
           <input
             type="text"
+            name="destination"
+            autoComplete="off"
             value={destination}
             onChange={(e) => setDestination(e.target.value)}
-            placeholder="e.g. Melvisharam / Chennai"
+            placeholder="e.g. Melvisharam / Chennai (leave blank if none)"
             className="w-full min-h-[50px] px-4 py-3 rounded-2xl border-2 border-slate-400 text-slate-900 text-base font-bold"
           />
         </div>
@@ -1566,6 +1607,8 @@ export default function NewBill() {
           </label>
           <input
             type="text"
+            name="termsOfDelivery"
+            autoComplete="off"
             value={termsOfDelivery}
             onChange={(e) => setTermsOfDelivery(e.target.value)}
             placeholder="e.g. Immediate / Payment on Delivery / Ex-Works"
