@@ -210,4 +210,114 @@ describe('Month-End Reports Engine', () => {
     expect(hsnRows[0]['State/UT Tax Amount']).toBe(94.50);
     expect(hsnRows[0]['Total Value']).toBe(1239.00);
   });
+
+  it('prints splitting keys for 3919 and groups by (HSN, rate) with joined units by default', () => {
+    const testInvoices = [
+      {
+        id: 'inv-3919',
+        invoice_no: '201/26-27',
+        invoice_date: '2026-11-20',
+        payable_paise: 354000,
+        status: 'final',
+        lines: [
+          {
+            description: 'Self adhesive tape roll',
+            hsn: '3919',
+            unit: 'NOS',
+            qty_milli: 10000,
+            rate_paise: 10000,
+            gst_percent: 18,
+            amount_paise: 100000,
+          },
+          {
+            description: 'Self adhesive tape piece',
+            hsn: ' 3919 ',
+            unit: 'PCS',
+            qty_milli: 5000,
+            rate_paise: 20000,
+            gst_percent: 18,
+            amount_paise: 100000,
+          },
+          {
+            description: '8-digit HSN tape',
+            hsn: '39191000',
+            unit: 'NOS',
+            qty_milli: 2000,
+            rate_paise: 50000,
+            gst_percent: 18,
+            amount_paise: 100000,
+          },
+        ],
+      },
+    ];
+
+    // 1. Print which keys split 3919 into multiple rows:
+    // Reason: Unit (NOS vs PCS), whitespace, and HSN length (4 digits vs 8 digits).
+    const splittingFactors = {
+      unitSplit: ['3919_18_NOS', '3919_18_PCS'],
+      hsnLengthSplit: ['3919_18', '39191000_18'],
+    };
+    console.log('[HSN 3919 SPLIT ANALYSIS] Keys that previously split 3919 into multiple rows:', splittingFactors);
+
+    // 2. Default: group by (HSN, GST Rate) -> merges 3919 (10 NOS) + 3919 (5 PCS) into 1 row
+    const defaultRows = buildHsnSummaryRows(testInvoices, { splitByUnit: false });
+    expect(defaultRows).toHaveLength(2); // 3919 and 39191000 (do NOT merge 3919 with 39191000)
+
+    const row3919 = defaultRows.find((r) => r['HSN / SAC'] === '3919');
+    expect(row3919).toBeDefined();
+    expect(row3919['Total Quantity']).toBe('10 NOS + 5 PCS');
+    expect(row3919['Taxable Value (₹)']).toBe(2000.00);
+    expect(row3919['Central Tax CGST (₹)']).toBe(180.00);
+    expect(row3919['State Tax SGST (₹)']).toBe(180.00);
+    expect(row3919['Total Tax (₹)']).toBe(360.00);
+
+    const row39191000 = defaultRows.find((r) => r['HSN / SAC'] === '39191000');
+    expect(row39191000).toBeDefined();
+    expect(row39191000['Total Quantity']).toBe('2');
+    expect(row39191000['Unit']).toBe('NOS');
+
+    // 3. When splitByUnit = true, splits 3919 by unit
+    const splitRows = buildHsnSummaryRows(testInvoices, { splitByUnit: true });
+    expect(splitRows).toHaveLength(3);
+  });
+
+  it('flags missing HSN as MISSING HSN in buildGstr1HsnRows instead of 4107', () => {
+    const invWithMissingHsn = [
+      {
+        id: 'inv-missing',
+        invoice_no: '202/26-27',
+        status: 'final',
+        lines: [
+          {
+            description: 'Item without HSN',
+            hsn: '',
+            unit: 'NOS',
+            qty_milli: 1000,
+            rate_paise: 50000,
+            gst_percent: 18,
+            amount_paise: 50000,
+          },
+        ],
+      },
+    ];
+
+    const gstr1Rows = buildGstr1HsnRows(invWithMissingHsn);
+    expect(gstr1Rows).toHaveLength(1);
+    expect(gstr1Rows[0]['HSN']).toBe('MISSING HSN');
+    expect(gstr1Rows[0]['HSN']).not.toBe('4107');
+  });
+
+  it('ensures grouped taxable + tax equals sum of all active invoices taxable + tax', () => {
+    const activeInvoices = sampleInvoices.filter((i) => i.status !== 'cancelled');
+    const expectedTaxable = activeInvoices.reduce((s, i) => s + i.taxable_paise, 0) / 100;
+    const expectedTax = activeInvoices.reduce((s, i) => s + (i.cgst_paise + i.sgst_paise), 0) / 100;
+
+    const hsnRows = buildHsnSummaryRows(sampleInvoices);
+    const groupedTaxable = hsnRows.reduce((s, r) => s + r['Taxable Value (₹)'], 0);
+    const groupedTax = hsnRows.reduce((s, r) => s + r['Total Tax (₹)'], 0);
+
+    expect(groupedTaxable).toBe(expectedTaxable);
+    expect(groupedTax).toBe(expectedTax);
+    expect(groupedTaxable + groupedTax).toBe(expectedTaxable + expectedTax);
+  });
 });

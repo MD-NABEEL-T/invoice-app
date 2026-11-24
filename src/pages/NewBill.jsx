@@ -217,6 +217,7 @@ export default function NewBill() {
         }
 
         // 4. Restore draft from localStorage (if exists)
+        let hasDraft = false;
         try {
           const savedDraftJson = localStorage.getItem(DRAFT_STORAGE_KEY);
           if (savedDraftJson) {
@@ -227,6 +228,7 @@ export default function NewBill() {
                 draft.buyerOrderNo ||
                 (Array.isArray(draft.lines) && draft.lines.length > 0))
             ) {
+              hasDraft = true;
               if (draft.billDate) setBillDate(draft.billDate);
               if (draft.selectedBuyerId) setSelectedBuyerId(draft.selectedBuyerId);
               if (draft.selectedBranchId) setSelectedBranchId(draft.selectedBranchId);
@@ -247,6 +249,18 @@ export default function NewBill() {
           }
         } catch (draftErr) {
           console.warn('Could not restore draft:', draftErr);
+        }
+
+        // Set Defaults on a NEW bill only (not when editing, copying, or restoring a draft)
+        if (!editBillId && !copyFromId && !hasDraft && buyersData && buyersData.length > 0) {
+          const defaultBuyer = buyersData.find(
+            (b) => b.name && b.name.trim().toUpperCase() === 'KH EXPORT INDIA PRIVATE LTD'
+          ) || buyersData.find(
+            (b) => b.name && b.name.toUpperCase().includes('KH EXPORT')
+          );
+          if (defaultBuyer) {
+            setSelectedBuyerId(defaultBuyer.id);
+          }
         }
       } catch (err) {
         console.error('Initialization error:', err);
@@ -439,7 +453,7 @@ export default function NewBill() {
         );
         setBranches(validBranches);
 
-        // If previously selected branch belongs to this buyer, retain it; else default to first
+        // If previously selected branch belongs to this buyer, retain it; else default to LGD / preferred branch
         setSelectedBranchId((prev) => {
           const exists = validBranches.find((b) => b.id === prev);
           if (exists) {
@@ -447,6 +461,19 @@ export default function NewBill() {
             return prev;
           }
           if (validBranches.length > 0) {
+            // For a new bill, default to the Leather Goods Division (LGD) branch used on the most recent bill:
+            // "Unit-III (Melvisharam)" (id: 2ad13c40-9954-4132-898c-13f45fc7d2ad)
+            if (!editBillId && !copyFromId) {
+              const preferredBranch =
+                validBranches.find((b) => b.id === '2ad13c40-9954-4132-898c-13f45fc7d2ad') ||
+                validBranches.find((b) => b.label && b.label.includes('Unit-III (Melvisharam)')) ||
+                validBranches.find((b) => b.label && b.label.toUpperCase() === 'LGD') ||
+                validBranches.find((b) => b.address && b.address.toUpperCase().includes('LEATHER GOODS DIVISION UNIT-III'));
+              if (preferredBranch) {
+                setChosenAddress(preferredBranch.address);
+                return preferredBranch.id;
+              }
+            }
             setChosenAddress(validBranches[0].address);
             return validBranches[0].id;
           }
@@ -1505,13 +1532,15 @@ export default function NewBill() {
         {/* Buyer Order No & Order Date */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           <div>
-            <label className="block text-base font-bold text-slate-900 mb-1">
+            <label htmlFor="buyerOrderNo" className="block text-base font-bold text-slate-900 mb-1">
               Buyer Order No (Optional)
             </label>
             <input
               type="text"
+              id="buyerOrderNo"
               name="buyerOrderNo"
               autoComplete="off"
+              maxLength={200}
               value={buyerOrderNo}
               onChange={(e) => setBuyerOrderNo(e.target.value.toUpperCase())}
               placeholder="e.g. PO-1046 or leave blank"
@@ -1520,13 +1549,15 @@ export default function NewBill() {
           </div>
 
           <div>
-            <label className="block text-base font-bold text-slate-900 mb-1">
+            <label htmlFor="buyerOrderDate" className="block text-base font-bold text-slate-900 mb-1">
               Buyer Order Date (Free text)
             </label>
             <input
               type="text"
+              id="buyerOrderDate"
               name="buyerOrderDate"
               autoComplete="off"
+              maxLength={200}
               value={buyerOrderDate}
               onChange={(e) => setBuyerOrderDate(e.target.value)}
               placeholder="e.g. 10/04/2026 or multiple dates"
@@ -1538,13 +1569,15 @@ export default function NewBill() {
         {/* Delivery No & Delivery Date */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-base font-bold text-slate-900 mb-1">
+            <label htmlFor="deliveryNo" className="block text-base font-bold text-slate-900 mb-1">
               Delivery No (Optional)
             </label>
             <input
               type="text"
+              id="deliveryNo"
               name="deliveryNo"
               autoComplete="off"
+              maxLength={200}
               value={deliveryNo}
               onChange={(e) => setDeliveryNo(e.target.value)}
               placeholder="e.g. 0000 or leave blank"
@@ -1553,13 +1586,15 @@ export default function NewBill() {
           </div>
 
           <div>
-            <label className="block text-base font-bold text-slate-900 mb-1">
+            <label htmlFor="deliveryDate" className="block text-base font-bold text-slate-900 mb-1">
               Delivery Date (Free text)
             </label>
             <input
               type="text"
+              id="deliveryDate"
               name="deliveryDate"
               autoComplete="off"
+              maxLength={200}
               value={deliveryDate}
               onChange={(e) => setDeliveryDate(e.target.value)}
               placeholder="e.g. 18/11/2026 or 18/11/2026, 20/11/2026"
@@ -1570,13 +1605,15 @@ export default function NewBill() {
 
         {/* Despatched Through (Optional) */}
         <div>
-          <label className="block text-base font-bold text-slate-900 mb-1">
+          <label htmlFor="despatchedThrough" className="block text-base font-bold text-slate-900 mb-1">
             Despatched Through (Optional)
           </label>
           <input
             type="text"
+            id="despatchedThrough"
             name="despatchedThrough"
             autoComplete="off"
+            maxLength={200}
             value={despatchedThrough}
             onChange={(e) => setDespatchedThrough(e.target.value)}
             placeholder="e.g. Direct Delivery / Tempo"
@@ -1586,13 +1623,15 @@ export default function NewBill() {
 
         {/* Destination (Optional) */}
         <div>
-          <label className="block text-base font-bold text-slate-900 mb-1">
+          <label htmlFor="destination" className="block text-base font-bold text-slate-900 mb-1">
             Destination (Optional)
           </label>
           <input
             type="text"
+            id="destination"
             name="destination"
             autoComplete="off"
+            maxLength={200}
             value={destination}
             onChange={(e) => setDestination(e.target.value)}
             placeholder="e.g. Melvisharam / Chennai (leave blank if none)"
@@ -1602,13 +1641,38 @@ export default function NewBill() {
 
         {/* Terms of Delivery (Optional) */}
         <div>
-          <label className="block text-base font-bold text-slate-900 mb-1">
-            Terms of Delivery (Optional)
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label htmlFor="termsOfDelivery" className="block text-base font-bold text-slate-900">
+              Terms of Delivery (Optional)
+            </label>
+            {branches && branches.length > 0 && (
+              <select
+                id="termsBranchDropdown"
+                name="termsBranchDropdown"
+                className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-300 rounded-lg px-2 py-1 cursor-pointer"
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setTermsOfDelivery(e.target.value);
+                    e.target.value = '';
+                  }
+                }}
+                defaultValue=""
+              >
+                <option value="" disabled>-- Fill from Delivery Unit --</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.label || b.name || b.address}>
+                    {b.label || b.name || 'Branch'}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
           <input
             type="text"
+            id="termsOfDelivery"
             name="termsOfDelivery"
             autoComplete="off"
+            maxLength={200}
             value={termsOfDelivery}
             onChange={(e) => setTermsOfDelivery(e.target.value)}
             placeholder="e.g. Immediate / Payment on Delivery / Ex-Works"

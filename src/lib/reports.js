@@ -106,39 +106,45 @@ export function buildGstRegisterRows(invoices = []) {
 
 /**
  * 3. Generates HSN Summary table rows across all active invoices in the period.
- * Groups by (HSN, GST Rate).
+ * Default: Groups by (HSN, GST Rate).
+ * If splitByUnit is true: Groups by (HSN, GST Rate, Unit).
  */
-export function buildHsnSummaryRows(invoices = []) {
+export function buildHsnSummaryRows(invoices = [], { splitByUnit = false } = {}) {
   const activeInvoices = invoices.filter((inv) => inv.status !== 'cancelled');
   const hsnMap = new Map();
 
   for (const inv of activeInvoices) {
     for (const line of inv.lines || []) {
-      const hsn = String(line.hsn || '').trim() || 'OTHER';
+      const rawHsn = String(line.hsn || '').trim();
+      const hsn = rawHsn ? rawHsn : 'MISSING HSN';
       const gstPercent = Number(line.gst_percent ?? 0);
       const unit = String(line.unit || 'NOS').trim().toUpperCase();
       const desc = String(line.description || '').trim();
-      const key = `${hsn}_${gstPercent}_${unit}`;
+      const key = splitByUnit ? `${hsn}_${gstPercent}_${unit}` : `${hsn}_${gstPercent}`;
 
       const amountPaise = Number(
         line.amount_paise !== undefined && line.amount_paise !== null
           ? line.amount_paise
           : Math.round(((line.qty_milli || 0) * (line.rate_paise || 0)) / 1000)
       );
-
+      const freightPaise = Number(line.freight_paise ?? line.freightPaise ?? 0);
+      const lineTaxablePaise = amountPaise + freightPaise;
       const qtyMilli = Number(line.qty_milli || 0);
 
       const existing = hsnMap.get(key) || {
         hsn,
         description: desc,
         gstPercent,
-        unit,
-        totalQtyMilli: 0,
+        unitQuantities: new Map(),
         taxablePaise: 0,
       };
 
-      existing.totalQtyMilli += qtyMilli;
-      existing.taxablePaise += amountPaise;
+      const prevQty = existing.unitQuantities.get(unit) || 0;
+      existing.unitQuantities.set(unit, prevQty + qtyMilli);
+      existing.taxablePaise += lineTaxablePaise;
+      if (!existing.description && desc) {
+        existing.description = desc;
+      }
       hsnMap.set(key, existing);
     }
   }
@@ -148,11 +154,28 @@ export function buildHsnSummaryRows(invoices = []) {
     const cgstPaise = Math.floor(taxPaise / 2);
     const sgstPaise = taxPaise - cgstPaise;
 
+    let displayQty = '';
+    let displayUnit = '';
+
+    const units = Array.from(entry.unitQuantities.keys());
+    if (units.length === 1) {
+      displayUnit = units[0];
+      displayQty = formatMilliToQuantity(entry.unitQuantities.get(units[0]));
+    } else if (units.length > 1) {
+      displayQty = Array.from(entry.unitQuantities.entries())
+        .map(([u, qMilli]) => `${formatMilliToQuantity(qMilli)} ${u}`)
+        .join(' + ');
+      displayUnit = 'MIXED';
+    } else {
+      displayQty = '0';
+      displayUnit = 'NOS';
+    }
+
     return {
       'HSN / SAC': entry.hsn,
       'Description / Sample Item': entry.description,
-      'Total Quantity': formatMilliToQuantity(entry.totalQtyMilli),
-      'Unit': entry.unit,
+      'Total Quantity': displayQty,
+      'Unit': displayUnit,
       'GST Rate': `${entry.gstPercent}%`,
       'Taxable Value (₹)': paiseToNumber(entry.taxablePaise),
       'Central Tax CGST (₹)': paiseToNumber(cgstPaise),
@@ -167,7 +190,7 @@ export function buildHsnSummaryRows(invoices = []) {
 /**
  * 4. Exports all three reports into an Excel (.xlsx) workbook.
  */
-export async function exportMonthEndExcel({ invoices = [], periodTitle = 'Monthly' }) {
+export async function exportMonthEndExcel({ invoices = [], periodTitle = 'Monthly', splitByUnit = false } = {}) {
   const XLSX = await import('xlsx');
   const wb = XLSX.utils.book_new();
 
@@ -182,7 +205,7 @@ export async function exportMonthEndExcel({ invoices = [], periodTitle = 'Monthl
   XLSX.utils.book_append_sheet(wb, wsGst, 'GST Sales Register');
 
   // 3. HSN Summary Sheet
-  const hsnRows = buildHsnSummaryRows(invoices);
+  const hsnRows = buildHsnSummaryRows(invoices, { splitByUnit });
   const wsHsn = XLSX.utils.json_to_sheet(hsnRows);
   XLSX.utils.book_append_sheet(wb, wsHsn, 'HSN Summary');
 
@@ -278,7 +301,7 @@ export function buildGstr1B2bRows(invoices = []) {
 /**
  * 6. Generates official GSTR-1 Table 12 HSN Summary rows.
  */
-export function buildGstr1HsnRows(invoices = []) {
+export function buildGstr1HsnRows(invoices = [], { splitByUnit = false } = {}) {
   const activeInvoices = invoices.filter((inv) => inv.status !== 'cancelled');
   const hsnMap = new Map();
 
@@ -286,12 +309,13 @@ export function buildGstr1HsnRows(invoices = []) {
     const isInterState = inv.buyer_state_code && inv.buyer_state_code !== '33';
 
     for (const line of inv.lines || []) {
-      const hsn = String(line.hsn || '').trim() || '4107';
+      const rawHsn = String(line.hsn || '').trim();
+      const hsn = rawHsn ? rawHsn : 'MISSING HSN';
       const desc = String(line.description || '').trim();
       const unit = String(line.unit || 'PCS').trim().toUpperCase();
       const uqc = mapUnitToUqc(unit);
       const rate = Number(line.gst_percent ?? 5);
-      const key = `${hsn}_${rate}_${uqc}`;
+      const key = splitByUnit ? `${hsn}_${rate}_${uqc}` : `${hsn}_${rate}`;
 
       const amountPaise = Number(
         line.amount_paise !== undefined && line.amount_paise !== null
@@ -307,13 +331,19 @@ export function buildGstr1HsnRows(invoices = []) {
         description: desc,
         uqc,
         rate,
+        unitQuantities: new Map(),
         totalQtyMilli: 0,
         taxablePaise: 0,
         isInterState,
       };
 
+      const prevQty = existing.unitQuantities.get(unit) || 0;
+      existing.unitQuantities.set(unit, prevQty + qtyMilli);
       existing.totalQtyMilli += qtyMilli;
       existing.taxablePaise += lineTaxablePaise;
+      if (!existing.description && desc) {
+        existing.description = desc;
+      }
       hsnMap.set(key, existing);
     }
   }
@@ -333,11 +363,22 @@ export function buildGstr1HsnRows(invoices = []) {
       sgstPaise = taxPaise - cgstPaise;
     }
 
+    let finalUqc = entry.uqc;
+    let finalQty = Number(formatMilliToQuantity(entry.totalQtyMilli)) || 0;
+
+    const units = Array.from(entry.unitQuantities.keys());
+    if (units.length > 1) {
+      finalUqc = 'OTH-OTHERS';
+      finalQty = Array.from(entry.unitQuantities.entries())
+        .map(([u, q]) => `${formatMilliToQuantity(q)} ${u}`)
+        .join(' + ');
+    }
+
     return {
       'HSN': entry.hsn,
       'Description': entry.description,
-      'UQC': entry.uqc,
-      'Total Quantity': Number(formatMilliToQuantity(entry.totalQtyMilli)) || 0,
+      'UQC': finalUqc,
+      'Total Quantity': finalQty,
       'Total Value': paiseToNumber(totalValPaise),
       'Rate': entry.rate,
       'Taxable Value': paiseToNumber(entry.taxablePaise),
@@ -386,7 +427,7 @@ export function buildGstr1DocsRows(invoices = []) {
 /**
  * 8. Exports auditor-ready GSTR-1 workbook (.xlsx) matching GST portal format.
  */
-export async function exportGstr1Excel({ invoices = [], periodTitle = 'Monthly' }) {
+export async function exportGstr1Excel({ invoices = [], periodTitle = 'Monthly', splitByUnit = false } = {}) {
   const XLSX = await import('xlsx');
   const wb = XLSX.utils.book_new();
 
@@ -396,7 +437,7 @@ export async function exportGstr1Excel({ invoices = [], periodTitle = 'Monthly' 
   XLSX.utils.book_append_sheet(wb, wsB2b, 'b2b');
 
   // 2. hsn sheet
-  const hsnRows = buildGstr1HsnRows(invoices);
+  const hsnRows = buildGstr1HsnRows(invoices, { splitByUnit });
   const wsHsn = XLSX.utils.json_to_sheet(hsnRows);
   XLSX.utils.book_append_sheet(wb, wsHsn, 'hsn');
 

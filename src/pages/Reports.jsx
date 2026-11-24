@@ -129,6 +129,8 @@ export default function Reports() {
     };
   }, [filteredInvoices]);
 
+  const [splitByUnit, setSplitByUnit] = useState(false);
+
   // 4. Build tabular data
   const hardcopyRows = useMemo(
     () => buildHardcopyStatementRows(filteredInvoices),
@@ -139,8 +141,8 @@ export default function Reports() {
     [filteredInvoices]
   );
   const hsnRows = useMemo(
-    () => buildHsnSummaryRows(filteredInvoices),
-    [filteredInvoices]
+    () => buildHsnSummaryRows(filteredInvoices, { splitByUnit }),
+    [filteredInvoices, splitByUnit]
   );
 
   const [exportingGstr1, setExportingGstr1] = useState(false);
@@ -158,6 +160,7 @@ export default function Reports() {
       const res = await exportMonthEndExcel({
         invoices: filteredInvoices,
         periodTitle,
+        splitByUnit,
       });
 
       setExportMessage(`Successfully exported ${res.filename}!`);
@@ -182,6 +185,7 @@ export default function Reports() {
       const res = await exportGstr1Excel({
         invoices: filteredInvoices,
         periodTitle,
+        splitByUnit,
       });
 
       setExportMessage(`Auditor GSTR-1 file ready: ${res.filename}! Matches official GST portal schema.`);
@@ -606,7 +610,7 @@ export default function Reports() {
       {/* TAB 3: HSN Summary */}
       {!loading && filteredInvoices.length > 0 && activeTab === 'hsn' && (
         <div className="bg-white rounded-2xl border-2 border-slate-300 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+          <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50">
             <div>
               <h3 className="text-base font-black text-slate-900">
                 HSN-wise Summary
@@ -615,9 +619,20 @@ export default function Reports() {
                 Aggregated quantities and taxable values per HSN code
               </p>
             </div>
-            <span className="text-xs font-bold text-slate-600 font-mono">
-              {hsnRows.length} HSN groups
-            </span>
+            <div className="flex items-center space-x-4">
+              <label className="flex items-center space-x-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={splitByUnit}
+                  onChange={(e) => setSplitByUnit(e.target.checked)}
+                  className="rounded border-slate-400 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <span>Split by unit (GST portal UQC)</span>
+              </label>
+              <span className="text-xs font-bold text-slate-600 font-mono">
+                {hsnRows.length} HSN groups
+              </span>
+            </div>
           </div>
 
           <div className="overflow-x-auto">

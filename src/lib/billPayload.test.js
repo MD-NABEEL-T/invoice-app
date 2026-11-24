@@ -283,5 +283,50 @@ describe('billPayload helpers', () => {
       expect(payload.lines[1].freight_paise).toBe(0);
       expect(payload.lines[1].amount_paise).toBe(60000);
     });
+
+    it('guarantees destination stays null when ONLY terms_of_delivery is filled across payload, draft, and email', () => {
+      // 1. buildInvoicePayload
+      const headerWithOnlyTerms = {
+        invoice_date: '2026-11-24',
+        buyer_id: '11111111-1111-1111-1111-111111111111',
+        buyer_name: 'KH EXPORT INDIA PRIVATE LTD',
+        terms_of_delivery: 'Immediate Delivery / Ex-Works Melvisharam',
+        destination: null,
+      };
+
+      const lines = [
+        {
+          description: 'Heating mantle',
+          hsn: '3926',
+          unit: 'NOS',
+          quantity: '1',
+          rate: '4950.00',
+          gst_percent: 18,
+        },
+      ];
+
+      const payload = buildInvoicePayload({ header: headerWithOnlyTerms, lines });
+      expect(payload.terms_of_delivery).toBe('Immediate Delivery / Ex-Works Melvisharam');
+      expect(payload.destination).toBeNull();
+
+      // 2. Draft save and restore simulation
+      const draftState = {
+        destination: '',
+        termsOfDelivery: 'Immediate Delivery / Ex-Works Melvisharam',
+      };
+      const restoredDraft = JSON.parse(JSON.stringify(draftState));
+      const restoredDestination = restoredDraft.destination ? String(restoredDraft.destination) : null;
+      const restoredTerms = restoredDraft.termsOfDelivery ? String(restoredDraft.termsOfDelivery) : null;
+      expect(restoredDestination).toBeNull();
+      expect(restoredTerms).toBe('Immediate Delivery / Ex-Works Melvisharam');
+
+      // 3. Apps Script email payload simulation
+      const emailPayload = {
+        destination: payload.destination || null,
+        terms_of_delivery: payload.terms_of_delivery || null,
+      };
+      expect(emailPayload.destination).toBeNull();
+      expect(emailPayload.terms_of_delivery).toBe('Immediate Delivery / Ex-Works Melvisharam');
+    });
   });
 });

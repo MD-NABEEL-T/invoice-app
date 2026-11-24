@@ -1,7 +1,7 @@
 -- Migration 011: Allow free-text delivery_date with punctuation and multiple dates
 --
 -- 1. Alter delivery_date column in invoices table from date to text
-ALTER TABLE public.invoices ALTER COLUMN delivery_date TYPE text USING delivery_date::text;
+ALTER TABLE public.invoices ALTER COLUMN delivery_date TYPE text USING to_char(delivery_date, 'DD/MM/YYYY');
 
 -- 2. Update create_invoice RPC to accept free text delivery_date without casting to date
 DROP FUNCTION IF EXISTS public.create_invoice(jsonb);

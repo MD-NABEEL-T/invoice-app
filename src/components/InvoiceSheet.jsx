@@ -345,17 +345,17 @@ export function InvoicePage({
             </div>
 
             {/* Row 4: Delivery No: (11pt bold) | no (12pt bold) ; Delivery Dt: (11pt bold) | date (12pt bold) */}
-            <div className="flex font-bold" style={{ borderBottom: '1px solid #000000', minHeight: '38px', display: 'flex' }}>
+            <div className="flex font-bold" style={{ borderBottom: '1px solid #000000', minHeight: '38px', height: 'auto', display: 'flex' }}>
               <div className="p-1.5 text-[11pt]" style={{ width: '17.99%', borderRight: '1px solid #000000' }}>
                 Delivery No:
               </div>
-              <div className="p-1.5 text-[12pt]" style={{ width: '27.89%', borderRight: '1px solid #000000' }}>
+              <div className="p-1.5 text-[12pt] whitespace-pre-line break-words" style={{ width: '27.89%', borderRight: '1px solid #000000' }}>
                 {invoice.delivery_no || '-'}
               </div>
               <div className="p-1.5 text-[11pt]" style={{ width: '15.67%', borderRight: '1px solid #000000' }}>
                 Delivery Dt:
               </div>
-              <div className="p-1.5 text-[12pt]" style={{ width: '38.45%' }}>
+              <div className="p-1.5 text-[12pt] whitespace-pre-line break-words" style={{ width: '38.45%' }}>
                 {invoice.delivery_date ? formatDisplayDate(invoice.delivery_date) : '-'}
               </div>
             </div>
