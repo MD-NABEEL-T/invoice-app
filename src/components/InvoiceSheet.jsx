@@ -243,7 +243,7 @@ export function InvoicePage({
             }}
           >
             {/* Rows 2-4: Firm Details (Centered, bold, top-aligned) */}
-            <div className="p-2 text-center" style={{ minHeight: '170px' }}>
+            <div className="p-2 text-center" style={{ minHeight: '145px' }}>
               <h2
                 className="text-[15pt] font-bold uppercase tracking-wide leading-tight mb-1"
                 style={{ color: '#000000' }}
@@ -276,7 +276,7 @@ export function InvoicePage({
               className="p-2"
               style={{
                 borderTop: '1px solid #000000',
-                minHeight: '142px',
+                minHeight: '125px',
               }}
             >
               <span className="text-[11pt] font-bold block text-left" style={{ color: '#000000' }}>
@@ -292,11 +292,9 @@ export function InvoicePage({
                 >
                   {invoice.buyer_address}
                 </div>
-                {invoice.buyer_gstin && (
-                  <p className="text-[11pt] font-bold pt-1" style={{ color: '#000000' }}>
-                    GSTIN:{invoice.buyer_gstin}
-                  </p>
-                )}
+                <p className="text-[11pt] font-bold pt-1" style={{ color: '#000000' }}>
+                  GSTIN:{invoice.buyer_gstin || '-'}
+                </p>
               </div>
             </div>
           </div>
@@ -311,7 +309,7 @@ export function InvoicePage({
             }}
           >
             {/* Row 2: INVOICE No: (11pt bold) | no (14pt bold) ; Dated: (11pt bold) | date (13pt bold) */}
-            <div className="flex font-bold" style={{ borderBottom: '1px solid #000000', minHeight: '66px', display: 'flex' }}>
+            <div className="flex font-bold" style={{ borderBottom: '1px solid #000000', minHeight: '54px', display: 'flex' }}>
               <div className="p-1.5 text-[11pt]" style={{ width: '17.99%', borderRight: '1px solid #000000' }}>
                 INVOICE No:
               </div>
@@ -326,21 +324,21 @@ export function InvoicePage({
               </div>
             </div>
 
-            {/* Row 3: Buyer Order: (11pt bold) | order no (12pt bold) ; Dated: (11pt bold) | date (12pt bold) - hidden if empty */}
-            <div className="flex font-bold" style={{ borderBottom: '1px solid #000000', minHeight: '66px', display: 'flex' }}>
+            {/* Row 3: Buyer Order: (11pt bold) | order no (12pt bold) ; Dated: (11pt bold) | date (12pt bold) */}
+            <div className="flex font-bold" style={{ borderBottom: '1px solid #000000', minHeight: '54px', display: 'flex' }}>
               <div className="p-1.5 text-[11pt]" style={{ width: '17.99%', borderRight: '1px solid #000000' }}>
-                {invoice.buyer_order_no ? 'Buyer Order:' : ''}
+                Buyer Order:
               </div>
               <div className="p-1.5 text-[12pt] whitespace-pre-line" style={{ width: '27.89%', borderRight: '1px solid #000000' }}>
-                {invoice.buyer_order_no || ''}
+                {invoice.buyer_order_no || '-'}
               </div>
               <div className="p-1.5 text-[11pt]" style={{ width: '15.67%', borderRight: '1px solid #000000' }}>
-                {invoice.buyer_order_no && invoice.buyer_order_date ? 'Dated:' : ''}
+                Dated:
               </div>
               <div className="p-1.5 text-[12pt] whitespace-pre-line" style={{ width: '38.45%' }}>
-                {invoice.buyer_order_no && invoice.buyer_order_date
+                {invoice.buyer_order_date
                   ? invoice.buyer_order_date.split('\n').map((d) => formatDisplayDate(d) || d).join('\n')
-                  : ''}
+                  : '-'}
               </div>
             </div>
 
@@ -361,7 +359,7 @@ export function InvoicePage({
             </div>
 
             {/* Row 5: Despatched through: (11pt bold) | value (12pt bold) ; Destination: (11pt bold) | value (12pt bold) */}
-            <div className="flex font-bold" style={{ borderBottom: '1px solid #000000', minHeight: '66px', display: 'flex' }}>
+            <div className="flex font-bold" style={{ borderBottom: '1px solid #000000', minHeight: '56px', display: 'flex' }}>
               <div className="p-1.5 text-[11pt]" style={{ width: '17.99%', borderRight: '1px solid #000000' }}>
                 Despatched through:
               </div>
@@ -377,13 +375,11 @@ export function InvoicePage({
             </div>
 
             {/* Row 6: Terms of Delivery: (C:H merged, 11pt bold, centered, top-aligned) */}
-            <div className="p-1.5 text-center font-bold text-[11pt]" style={{ minHeight: '76px' }}>
+            <div className="p-1.5 text-center font-bold text-[11pt]" style={{ minHeight: '66px' }}>
               <div>Terms of Delivery:</div>
-              {invoice.terms_of_delivery && (
-                <div className="font-normal text-[11pt] pt-1 whitespace-pre-line">
-                  {invoice.terms_of_delivery}
-                </div>
-              )}
+              <div className="font-normal text-[11pt] pt-1 whitespace-pre-line">
+                {invoice.terms_of_delivery || '-'}
+              </div>
             </div>
           </div>
         </div>
@@ -400,8 +396,8 @@ export function InvoicePage({
                 height: '36px',
               }}
             >
-              <th style={{ width: '9.22%', borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>SI. No</th>
-              <th style={{ width: '23.16%', borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>Description of Goods</th>
+              <th style={{ width: '5.58%', borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>SI. No</th>
+              <th style={{ width: '26.81%', borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>Description of Goods</th>
               <th style={{ width: '12.16%', borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>HSN/SAC</th>
               <th style={{ width: '5.63%', borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>TAX%</th>
               <th style={{ width: '13.23%', borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>Quantity</th>
@@ -427,7 +423,7 @@ export function InvoicePage({
                     style={{
                       color: '#000000',
                       borderBottom: '1px solid #000000',
-                      minHeight: '32px',
+                      minHeight: '30px',
                     }}
                   >
                     <td className="py-1 px-1 text-center font-normal" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
@@ -488,9 +484,9 @@ export function InvoicePage({
               }
             })}
 
-            {/* Spacer Rows: Pad so bill has at least 5 boxed rows matching Excel (min 8mm / 32px each) */}
+            {/* Spacer Rows: Pad so bill has at least 5 boxed rows matching Excel (min 8mm each) */}
             {emptyRowCount > 0 && Array.from({ length: emptyRowCount }).map((_, rIdx) => (
-              <tr key={`empty-${rIdx}`} style={{ height: '32px', borderBottom: '1px solid #000000' }}>
+              <tr key={`empty-${rIdx}`} style={{ height: '30px', borderBottom: '1px solid #000000' }}>
                 <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
                 <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
                 <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
@@ -515,14 +511,14 @@ export function InvoicePage({
               </tr>
             )}
 
-            {/* Final Page: Clean CGST & SGST Rows (12pt, min 8mm) immediately after items, all boxed */}
+            {/* Final Page: Clean CGST & SGST Rows (12pt) immediately after items, all boxed */}
             {isLast && rateGroups.map((group) => (
               <React.Fragment key={group.gstPercent}>
                 <tr
                   style={{
                     color: '#000000',
                     borderBottom: '1px solid #000000',
-                    height: '32px',
+                    height: '30px',
                   }}
                 >
                   <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
@@ -540,7 +536,7 @@ export function InvoicePage({
                   style={{
                     color: '#000000',
                     borderBottom: '1px solid #000000',
-                    height: '32px',
+                    height: '30px',
                   }}
                 >
                   <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
@@ -576,7 +572,7 @@ export function InvoicePage({
               if (ro === 0) return null;
               const sign = ro > 0 ? '+' : '';
               return (
-                <tr style={{ borderBottom: '1px solid #000000', height: '32px' }}>
+                <tr style={{ borderBottom: '1px solid #000000', height: '30px' }}>
                   <td style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>&nbsp;</td>
                   <td className="py-1 px-2 text-left font-normal text-[12pt]" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
                     Round Off
@@ -601,7 +597,7 @@ export function InvoicePage({
                   borderTop: '1px solid #000000',
                   borderBottom: '1px solid #000000',
                   color: '#000000',
-                  height: '32px',
+                  height: '30px',
                 }}
               >
                 <td
@@ -647,18 +643,18 @@ export function InvoicePage({
                   style={{
                     backgroundColor: '#ffffff',
                     color: '#000000',
-                    height: '32px',
+                    height: '28px',
                   }}
                 >
                   <th
                     rowSpan="2"
-                    style={{ width: '9.22%', borderRight: '1px solid #000000', borderBottom: '1px solid #000000', verticalAlign: 'middle' }}
+                    style={{ width: '5.58%', borderRight: '1px solid #000000', borderBottom: '1px solid #000000', verticalAlign: 'middle' }}
                   >
                     HSN/SAC
                   </th>
                   <th
                     rowSpan="2"
-                    style={{ width: '23.16%', borderRight: '1px solid #000000', borderBottom: '1px solid #000000', verticalAlign: 'middle' }}
+                    style={{ width: '26.81%', borderRight: '1px solid #000000', borderBottom: '1px solid #000000', verticalAlign: 'middle' }}
                   >
                     Taxable Value
                   </th>
@@ -680,7 +676,7 @@ export function InvoicePage({
                   style={{
                     backgroundColor: '#ffffff',
                     color: '#000000',
-                    height: '32px',
+                    height: '28px',
                   }}
                 >
                   <th style={{ width: '12.16%', borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
@@ -704,7 +700,7 @@ export function InvoicePage({
                     style={{
                       color: '#000000',
                       borderBottom: '1px solid #000000',
-                      height: '32px',
+                      height: '28px',
                     }}
                   >
                     <td className="py-1 px-1 text-center font-normal text-[11pt]" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
@@ -734,7 +730,7 @@ export function InvoicePage({
                     borderTop: '1px solid #000000',
                     borderBottom: '1px solid #000000',
                     color: '#000000',
-                    height: '32px',
+                    height: '28px',
                   }}
                 >
                   <td colSpan="5" className="py-1 px-2 text-left font-normal text-[11.5pt]" style={{ borderRight: '1px solid #000000', borderBottom: '1px solid #000000' }}>
@@ -776,8 +772,8 @@ export function InvoicePage({
             For {firm.name || 'Khansa Enterprises'}
           </div>
 
-          {/* Blank space for signing (32px / ~8.5mm to comfortably stay within printer margins) */}
-          <div className="h-8 print:h-7"></div>
+          {/* Blank space for signing (ample room for physical stamp & signature) */}
+          <div className="h-14 print:h-12"></div>
 
           {/* Signatures: 12pt bold */}
           <div className="flex justify-between items-end text-[12pt] font-bold pb-1">

@@ -13,8 +13,8 @@ const DEFAULT_FIRM = {
   declaration: 'We declare that this invoice shows the actual price of the goods described & that all particulars are true and correct',
 };
 
-// 8 Columns (mm) from Excel: A:18.2, B:45.7, C:24.0, D:11.1, E:26.1, F:20.9, G:21.1, H:30.2 = 197.3 mm total
-export const COL_WIDTHS = [18.2, 45.7, 24.0, 11.1, 26.1, 20.9, 21.1, 30.2];
+// 8 Columns (mm) from Excel: A:11.0 (SI. No), B:52.9 (Description), C:24.0, D:11.1, E:26.1, F:20.9, G:21.1, H:30.2 = 197.3 mm total
+export const COL_WIDTHS = [11.0, 52.9, 24.0, 11.1, 26.1, 20.9, 21.1, 30.2];
 export const MARGIN = 6.35;
 export const PAGE_WIDTH = 210;
 export const PAGE_HEIGHT = 297;
@@ -211,20 +211,19 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
     doc.setFontSize(13);
     const r2ValGH = getWrappedLines(doc, toDisplayDate(invoice.invoice_date), ghW - 2.4, ghW);
     const r2MaxLines = Math.max(1, r2LabelC.length, r2ValDE.length, r2LabelF.length, r2ValGH.length);
-    const row2H = Math.max(14.0, r2MaxLines * 4.8 + 2.5);
+    const row2H = Math.max(12.0, r2MaxLines * 4.8 + 2.0);
 
-    // Row 3 heights (Buyer order & date, supports multiline; hidden if empty):
-    const hasBuyerOrder = Boolean(invoice.buyer_order_no && String(invoice.buyer_order_no).trim());
+    // Row 3 heights (Buyer order & date, supports multiline; shows '-' if empty):
     doc.setFontSize(11);
-    const r3LabelC = getWrappedLines(doc, hasBuyerOrder ? 'Buyer Order:' : '', COL_WIDTHS[2] - 2.0, COL_WIDTHS[2]);
+    const r3LabelC = getWrappedLines(doc, 'Buyer Order:', COL_WIDTHS[2] - 2.0, COL_WIDTHS[2]);
     doc.setFontSize(12);
-    const r3ValDE = getWrappedLines(doc, hasBuyerOrder ? invoice.buyer_order_no : '', deW - 2.4, deW);
+    const r3ValDE = getWrappedLines(doc, invoice.buyer_order_no || '-', deW - 2.4, deW);
     doc.setFontSize(11);
-    const r3LabelF = getWrappedLines(doc, hasBuyerOrder && invoice.buyer_order_date ? 'Dated:' : '', COL_WIDTHS[5] - 2.0, COL_WIDTHS[5]);
+    const r3LabelF = getWrappedLines(doc, 'Dated:', COL_WIDTHS[5] - 2.0, COL_WIDTHS[5]);
     doc.setFontSize(12);
-    const r3ValGH = getWrappedLines(doc, hasBuyerOrder && invoice.buyer_order_date ? toDisplayDate(invoice.buyer_order_date) : '', ghW - 2.4, ghW);
+    const r3ValGH = getWrappedLines(doc, invoice.buyer_order_date ? toDisplayDate(invoice.buyer_order_date) : '-', ghW - 2.4, ghW);
     const r3MaxLines = Math.max(1, r3LabelC.length, r3ValDE.length, r3LabelF.length, r3ValGH.length);
-    const row3H = Math.max(14.0, r3MaxLines * 4.6 + 2.5);
+    const row3H = Math.max(12.0, r3MaxLines * 4.6 + 2.0);
 
     // Row 4 heights (Delivery No & Dt):
     doc.setFontSize(11);
@@ -236,7 +235,7 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
     doc.setFontSize(12);
     const r4ValGH = getWrappedLines(doc, invoice.delivery_date ? toDisplayDate(invoice.delivery_date) : '-', ghW - 2.4, ghW);
     const r4MaxLines = Math.max(1, r4LabelC.length, r4ValDE.length, r4LabelF.length, r4ValGH.length);
-    const row4H = Math.max(8.5, r4MaxLines * 4.6 + 2.0);
+    const row4H = Math.max(8.0, r4MaxLines * 4.6 + 2.0);
 
     const block1RightH = row2H + row3H + row4H;
 
@@ -247,7 +246,7 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
     const firmAddrLines = getWrappedLines(doc, firm.address || '', leftW - 3);
     const firmReqH = (firmNameLines.length * 5.2) + (firmAddrLines.length * 4.2) + 4.2 + (firm.email ? 3.8 : 0) + (firm.phone ? 4.0 : 0) + 4.5;
 
-    const block1H = Math.max(block1RightH, firmReqH, 37.0);
+    const block1H = Math.max(block1RightH, firmReqH, 32.0);
     const finalRow4H = row4H + (block1H - block1RightH); // Absorbs extra height so left & right stay aligned
 
     // Draw Left Block 1 Box
@@ -337,11 +336,12 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
     doc.setFontSize(12);
     const r5ValGH = getWrappedLines(doc, invoice.destination || '-', ghW - 2.4, ghW);
     const r5MaxLines = Math.max(1, r5LabelC.length, r5ValDE.length, r5LabelF.length, r5ValGH.length);
-    const row5H = Math.max(14.0, r5MaxLines * 4.6 + 2.5);
+    const row5H = Math.max(12.0, r5MaxLines * 4.6 + 2.0);
 
     doc.setFontSize(11);
-    const r6TermsLines = getWrappedLines(doc, invoice.terms_of_delivery || '', rightW - 6, rightW);
-    const row6BaseH = Math.max(14.0, r6TermsLines.length * 4.4 + 5.5);
+    const r6TermsText = (invoice.terms_of_delivery && String(invoice.terms_of_delivery).trim()) || '-';
+    const r6TermsLines = getWrappedLines(doc, r6TermsText, rightW - 6, rightW);
+    const row6BaseH = Math.max(12.0, r6TermsLines.length * 4.4 + 5.5);
 
     // Buyer block height calculation:
     // "Buyer:" alone on first line
@@ -349,10 +349,10 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
     const buyerNameLines = getWrappedLines(doc, (invoice.buyer_name || '').toUpperCase(), leftW - 3);
     doc.setFontSize(11);
     const buyerAddrLines = getWrappedLines(doc, invoice.buyer_address || '', leftW - 3);
-    const buyerReqH = 5.0 + (buyerNameLines.length * 4.8) + (buyerAddrLines.length * 4.0) + (invoice.buyer_gstin ? 4.2 : 0) + 3.0;
+    const buyerReqH = 5.0 + (buyerNameLines.length * 4.8) + (buyerAddrLines.length * 4.0) + 4.2 + 3.0;
 
     const block2RightH = row5H + row6BaseH;
-    const block2H = Math.max(block2RightH, buyerReqH, 36.0);
+    const block2H = Math.max(block2RightH, buyerReqH, 32.0);
     const finalRow6H = row6BaseH + (block2H - block2RightH);
 
     // Draw Left Block 2 Box
@@ -377,9 +377,7 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
       curBY += 4.0;
     });
 
-    if (invoice.buyer_gstin) {
-      doc.text(`GSTIN:${invoice.buyer_gstin}`, COL_X[0] + leftW / 2, curBY + 3.2, { align: 'center' });
-    }
+    doc.text(`GSTIN:${invoice.buyer_gstin || '-'}`, COL_X[0] + leftW / 2, curBY + 3.2, { align: 'center' });
 
     // Render Right Block 2 Cells
     let curR2Y = y;
@@ -401,6 +399,7 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
     doc.setFont(fontName, 'bold');
     doc.setFontSize(11);
     doc.text('Terms of Delivery:', COL_X[2] + rightW / 2, curR2Y + 4.2, { align: 'center' });
+    doc.setFont(fontName, 'normal');
     if (r6TermsLines.length > 0) {
       let tY = curR2Y + 8.5;
       r6TermsLines.forEach((tl) => {
@@ -450,7 +449,7 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
 
     for (let r = 0; r < minRowCount; r++) {
       const rowItem = renderedItemRows[r];
-      let rHeight = 8.0;
+      let rHeight = 7.5;
 
       let descLines = [];
       if (rowItem && rowItem.type === 'item') {
@@ -458,7 +457,7 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
         doc.setFontSize(12);
         descLines = getWrappedLines(doc, rowItem.line.description || '', COL_WIDTHS[1] - 2.4, COL_WIDTHS[1]);
         if (descLines.length > 1) {
-          rHeight = Math.max(8.0, descLines.length * 4.2 + 2.0);
+          rHeight = Math.max(7.5, descLines.length * 4.2 + 2.0);
         }
       }
 
@@ -614,10 +613,10 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
     }
 
     // -------------------------------------------------------------
-    // FINAL PAGE: CGST & SGST ROWS (12pt, min row 7.5mm) immediately after items
+    // FINAL PAGE: CGST & SGST ROWS (12pt, min row 7.0mm) immediately after items
     // (label in Description, rate in TAX%, amount in Amount; other cells empty but boxed)
     // -------------------------------------------------------------
-    const taxRowH = 7.5;
+    const taxRowH = 7.0;
 
     rateGroups.forEach((group) => {
       // CGST Row
@@ -659,10 +658,10 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
     }
 
     // -------------------------------------------------------------
-    // GRAND TOTAL(ROUND OFF) ROW (7.5mm): A:B merged 12pt bold centered label;
+    // GRAND TOTAL(ROUND OFF) ROW (7.0mm): A:B merged 12pt bold centered label;
     // C:H merged 14pt bold value right-aligned, vertically centered, boxed.
     // -------------------------------------------------------------
-    const gtH = 7.5;
+    const gtH = 7.0;
     drawBox(doc, COL_X[0], y, leftW, gtH);
     drawBox(doc, COL_X[2], y, rightW, gtH);
     drawCell(doc, 'Grand Total(round off)', COL_X[0], y, leftW, gtH, { fontSize: 12, fontStyle: 'bold', align: 'center', valign: 'middle', fontName });
@@ -678,7 +677,7 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
     doc.setFont(fontName, 'bold');
     doc.setFontSize(11.5);
     const wordsLines = getWrappedLines(doc, wordsVal.toUpperCase(), rightW - 3.0, rightW);
-    const wordsH = Math.max(8.0, wordsLines.length * 4.6 + 2.4);
+    const wordsH = Math.max(7.5, wordsLines.length * 4.6 + 2.0);
 
     doc.line(COL_X[0], y, COL_X[8], y); // Top border only
     doc.line(COL_X[0], y + wordsH, COL_X[8], y + wordsH); // Bottom border only
@@ -689,14 +688,14 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
 
     // -------------------------------------------------------------
     // HSN SUMMARY TABLE (Directly below, no gap)
-    // 2 header rows (7mm each): 11pt bold centered boxed.
-    // Data rows (7mm each): 11pt regular, all boxed.
-    // Total(round off) row (7mm): 11.5pt regular label, 11.5pt bold total tax.
+    // 2 header rows (6.5mm each): 11pt bold centered boxed.
+    // Data rows (6.5mm each): 11pt regular, all boxed.
+    // Total(round off) row (6.5mm): 11.5pt regular label, 11.5pt bold total tax.
     // Amount in words row: 11pt bold label, 11.5pt bold text, top border only.
     // -------------------------------------------------------------
-    const hsnH1 = 7.0;
-    const hsnH2 = 7.0;
-    const hsnHeaderH = hsnH1 + hsnH2; // 14.0 mm
+    const hsnH1 = 6.5;
+    const hsnH2 = 6.5;
+    const hsnHeaderH = hsnH1 + hsnH2; // 13.0 mm
 
     // Col A: HSN/SAC merged over both rows
     drawBox(doc, COL_X[0], y, COL_WIDTHS[0], hsnHeaderH);
@@ -736,9 +735,9 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
 
     y += hsnHeaderH;
 
-    // HSN Data Rows (7.0 mm each): all boxed, 10.5pt to safely fit 8-digit codes
+    // HSN Data Rows (6.5 mm each): all boxed, 10.5pt to safely fit 8-digit codes
     hsnSummary.rows.forEach((row) => {
-      const dRowH = 7.0;
+      const dRowH = 6.5;
       drawBox(doc, COL_X[0], y, COL_WIDTHS[0], dRowH);
       drawBox(doc, COL_X[1], y, COL_WIDTHS[1], dRowH);
       drawBox(doc, COL_X[2], y, COL_WIDTHS[2], dRowH);
@@ -756,8 +755,8 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
       y += dRowH;
     });
 
-    // Total(round off) row (7.0 mm): A:F merged 11.5pt regular label, G:H merged 11.5pt bold total tax
-    const hsnTotH = 7.0;
+    // Total(round off) row (6.5 mm): A:F merged 11.5pt regular label, G:H merged 11.5pt bold total tax
+    const hsnTotH = 6.5;
     const afW = COL_X[6] - COL_X[0]; // 146.0 mm
     drawBox(doc, COL_X[0], y, afW, hsnTotH);
     drawBox(doc, COL_X[6], y, ghW, hsnTotH);
@@ -770,7 +769,7 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
     doc.setFont(fontName, 'bold');
     doc.setFontSize(11.5);
     const taxWordsLines = getWrappedLines(doc, hsnSummary.taxInWords.toUpperCase(), rightW - 3.0, rightW);
-    const taxWordsH = Math.max(7.5, taxWordsLines.length * 4.6 + 2.4);
+    const taxWordsH = Math.max(7.0, taxWordsLines.length * 4.6 + 2.0);
 
     doc.line(COL_X[0], y, COL_X[8], y); // Top border only
     drawCell(doc, 'Amount in words', COL_X[0], y, leftW, taxWordsH, { fontSize: 11, fontStyle: 'bold', align: 'left', fontName, padding: 1.2 });
@@ -790,15 +789,15 @@ export function buildVectorInvoicePdf(invoice, firmProfile = null, options = {})
     doc.setFontSize(10.5);
     const decText = `Declaration: ${firm.declaration || DEFAULT_FIRM.declaration}`;
     doc.text(decText, COL_X[0], y + 3.0);
-    y += 6.0;
+    y += 5.5;
 
     // "For Khansa Enterprises" (11.5pt bold, right-aligned)
     doc.setFont(fontName, 'bold');
     doc.setFontSize(11.5);
     doc.text(`For ${firm.name || 'Khansa Enterprises'}`, COL_X[8], y + 3.0, { align: 'right' });
 
-    // Signing blank space: 10mm (clamped so signatures stay safely <= 278mm, leaving >= 19mm bottom margin)
-    const signGap = Math.min(11.0, Math.max(7.0, 278.0 - y - 6.0));
+    // Signing blank space: 14mm generous gap (clamped safely <= 278mm so signatures never cut off)
+    const signGap = Math.min(16.0, Math.max(10.0, 278.0 - y - 6.0));
     y += signGap;
 
     // Signatures (12pt bold)
